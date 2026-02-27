@@ -8,6 +8,6 @@ RUN npm install --omit=dev
 
 COPY . .
 
-EXPOSE 5000
+EXPOSE $PORT
 
 CMD ["node", "server.js"]
