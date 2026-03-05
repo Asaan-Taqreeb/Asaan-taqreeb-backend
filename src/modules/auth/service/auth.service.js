@@ -1,5 +1,11 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const sgMail = require('@sendgrid/mail');
 const User = require('../model/user.model');
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+const otpStore = {};
 
 const generateAccessToken = (userId, role) => {
   return jwt.sign({ id: userId, role }, process.env.JWT_SECRET, {
@@ -19,6 +25,10 @@ const buildUserPayload = (user) => ({
   email: user.email,
   role: user.role,
 });
+
+const generateOTP = () => {
+  return crypto.randomInt(100000, 999999).toString();
+};
 
 const register = async ({ name, email, password, role }) => {
   const existingUser = await User.findOne({ email });
@@ -121,4 +131,72 @@ const getMe = async (userId) => {
   return user;
 };
 
-module.exports = { register, login, refresh, logout, getMe };
+const requestPasswordReset = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) {
+    const error = new Error('User with this email does not exist');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const otp = generateOTP();
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+
+  otpStore[email] = { otp, expiresAt };
+
+  // For now, always run in "dev mode": don't call SendGrid, just log OTP.
+  console.log('DEV OTP for password reset:', { email, otp, expiresAt });
+  return { email, message: 'OTP generated (development mode, check server logs for code).' };
+};
+
+const verifyOtp = async (email, otp) => {
+  const record = otpStore[email];
+
+  if (!record) {
+    const error = new Error('No OTP found for this email. Please request again.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (Date.now() > record.expiresAt) {
+    delete otpStore[email];
+    const error = new Error('OTP has expired. Please request a new one.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (record.otp !== otp.toString()) {
+    const error = new Error('Invalid OTP.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  delete otpStore[email];
+
+  return { email, message: 'OTP verified successfully.' };
+};
+
+const resetPassword = async (email, newPassword) => {
+  const user = await User.findOne({ email }).select('+password');
+  if (!user) {
+    const error = new Error('User with this email does not exist');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return { email, message: 'Password has been reset successfully.' };
+};
+
+module.exports = {
+  register,
+  login,
+  refresh,
+  logout,
+  getMe,
+  requestPasswordReset,
+  verifyOtp,
+  resetPassword,
+};
