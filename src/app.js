@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const authRoutes = require('./modules/auth/routes/auth.routes');
 const vendorServiceRoutes = require('./modules/vendor/routes/vendorService.routes');
 const vendorRoutes = require('./modules/vendor/routes/vendor.routes');
+const bookingRoutes = require('./modules/booking/routes/booking.routes');
 const errorHandler = require('./shared/middleware/error.middleware');
 
 const app = express();
@@ -23,6 +24,7 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/vendor/services', vendorServiceRoutes);
 app.use('/api/v1/vendors', vendorRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
 
 app.use('*splat', (req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
