@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const sgMail = require('@sendgrid/mail');
+const { Resend } = require('resend');
 const User = require('../model/user.model');
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const otpStore = {};
 
@@ -143,10 +143,39 @@ const requestPasswordReset = async (email) => {
   const expiresAt = Date.now() + 5 * 60 * 1000;
 
   otpStore[email] = { otp, expiresAt };
+  const fromEmail = process.env.RESET_EMAIL_FROM || 'onboarding@resend.dev';
 
-  // For now, always run in "dev mode": don't call SendGrid, just log OTP.
-  console.log('DEV OTP for password reset:', { email, otp, expiresAt });
-  return { email, message: 'OTP generated (development mode, check server logs for code).' };
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #4F46E5;">Password Reset Request</h2>
+      <p>We received a request to reset your password for Asaan Taqreeb.</p>
+      <p>Your One-Time Password (OTP) is:</p>
+      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #4F46E5; margin: 16px 0;">
+        ${otp}
+      </div>
+      <p style="color: #666;">This OTP is valid for <strong>5 minutes</strong>.</p>
+      <p style="color: #666;">If you did not request this, you can ignore this email.</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #aaa;">Sent by Asaan Taqreeb — ${fromEmail}</p>
+    </div>
+  `;
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: email,
+      subject: 'Your OTP for Password Reset',
+      html,
+    });
+    console.log('Password reset OTP sent via Resend:', { email, otp });
+  } catch (error) {
+    console.error('Resend error while sending OTP:', error);
+    const err = new Error('Failed to send OTP email');
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return { email, message: 'OTP sent. Valid for 5 minutes.' };
 };
 
 const verifyOtp = async (email, otp) => {
