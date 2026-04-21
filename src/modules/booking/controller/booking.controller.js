@@ -33,9 +33,30 @@ const getVendorBookings = async (req, res, next) => {
   }
 };
 
+const updateBookingStatus = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json({ success: false, errors: errors.array() });
+    }
+
+    const { status, rejectionReason } = req.body;
+    const booking = await bookingService.updateBookingStatus(
+      req.params.id,
+      req.user.id,
+      status,
+      rejectionReason
+    );
+    res.status(200).json({ success: true, data: booking });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
   getVendorBookings,
+  updateBookingStatus,
 };
 

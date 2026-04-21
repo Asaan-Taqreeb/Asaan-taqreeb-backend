@@ -41,11 +41,18 @@ const resetPasswordValidation = [
     .withMessage('Password must be at least 6 characters'),
 ];
 
+const updateProfileValidation = [
+  body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+  body('phone').optional().trim(),
+  body('profileImage').optional().trim(),
+];
+
 router.post('/register', registerValidation, authController.register);
 router.post('/login', loginValidation, authController.login);
 router.post('/refresh', authController.refresh);
 router.post('/logout', protect, authController.logout);
 router.get('/me', protect, authController.getMe);
+router.put('/me', protect, updateProfileValidation, authController.updateProfile);
 
 router.post('/forgot-password', forgotPasswordValidation, authController.forgotPassword);
 router.post('/verify-otp', verifyOtpValidation, authController.verifyOtp);

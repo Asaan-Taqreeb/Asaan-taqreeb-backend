@@ -1,7 +1,8 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { protect } = require('../../../shared/middleware/auth.middleware');
+const { protect, authorize } = require('../../../shared/middleware/auth.middleware');
 const bookingController = require('../controller/booking.controller');
+const ROLES = require('../../../shared/enums/roles.enum');
 
 const router = express.Router();
 
@@ -17,14 +18,30 @@ const createBookingValidation = [
   body('timeSlot.to').notEmpty().withMessage('timeSlot.to is required'),
 ];
 
-// Client: create booking
-router.post('/', protect, createBookingValidation, bookingController.createBooking);
+const updateStatusValidation = [
+  body('status')
+    .isIn(['PENDING', 'CONFIRMED', 'APPROVED', 'REJECTED', 'CANCELLED'])
+    .withMessage('Invalid status'),
+  body('rejectionReason').optional().trim(),
+];
 
-// Client: get own bookings
-router.get('/me', protect, bookingController.getMyBookings);
+// Protected (Client): create booking
+router.post('/', protect, authorize(ROLES.CLIENT), createBookingValidation, bookingController.createBooking);
 
-// Vendor: get bookings for vendor's services
-router.get('/vendor/me', protect, bookingController.getVendorBookings);
+// Protected (Client): get own bookings
+router.get('/me', protect, authorize(ROLES.CLIENT), bookingController.getMyBookings);
+
+// Protected (Vendor): get bookings for vendor's services
+router.get('/vendor/me', protect, authorize(ROLES.VENDOR), bookingController.getVendorBookings);
+
+// Protected (Vendor): update booking status
+router.patch(
+  '/:id/status',
+  protect,
+  authorize(ROLES.VENDOR),
+  updateStatusValidation,
+  bookingController.updateBookingStatus
+);
 
 module.exports = router;
 

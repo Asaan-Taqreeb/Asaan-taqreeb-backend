@@ -219,6 +219,23 @@ const resetPassword = async (email, newPassword) => {
   return { email, message: 'Password has been reset successfully.' };
 };
 
+const updateProfile = async (userId, { name, phone, profileImage }) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    const error = new Error('User not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (name) user.name = name;
+  if (phone) user.phone = phone;
+  if (profileImage) user.profileImage = profileImage;
+
+  await user.save();
+
+  return buildUserPayload(user);
+};
+
 module.exports = {
   register,
   login,
@@ -228,4 +245,5 @@ module.exports = {
   requestPasswordReset,
   verifyOtp,
   resetPassword,
+  updateProfile,
 };

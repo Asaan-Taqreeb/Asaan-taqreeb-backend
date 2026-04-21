@@ -31,6 +31,14 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    phone: {
+      type: String,
+      trim: true,
+    },
+    profileImage: {
+      type: String,
+      trim: true,
+    },
     refreshToken: {
       type: String,
       select: false,

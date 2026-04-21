@@ -104,9 +104,16 @@ const vendorServiceSchema = new mongoose.Schema(
       type: [optionalServiceSchema],
       default: [],
     },
+    images: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 );
+
+// Unique compound index: one active service per vendor per category
+vendorServiceSchema.index({ user: 1, category: 1 }, { unique: true });
 
 const VendorService = mongoose.model('VendorService', vendorServiceSchema);
 
