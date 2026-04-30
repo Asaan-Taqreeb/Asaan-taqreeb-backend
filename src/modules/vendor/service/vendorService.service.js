@@ -57,9 +57,8 @@ const createVendorService = async (userId, payload) => {
 
   const existingService = await VendorService.findOne({ user: userId, category });
   if (existingService) {
-    const error = new Error(`You already have an active service for ${category}. Delete it first to create a new one.`);
-    error.statusCode = 409;
-    throw error;
+    // Update existing service instead of rejecting - allows vendors to update their service without deleting
+    return updateService(existingService._id, userId, payload);
   }
 
   const vendorService = await VendorService.create({
@@ -110,7 +109,7 @@ const updateService = async (serviceId, vendorId, data) => {
     throw error;
   }
 
-  const { basicInfo, capacity, images } = data;
+  const { basicInfo, capacity, images, optionalServices } = data;
 
   if (basicInfo) {
     if (basicInfo.name) service.basicInfo.name = basicInfo.name;
@@ -126,6 +125,10 @@ const updateService = async (serviceId, vendorId, data) => {
 
   if (images) {
     service.images = images;
+  }
+
+  if (optionalServices !== undefined && Array.isArray(optionalServices)) {
+    service.optionalServices = optionalServices.filter((s) => s?.name?.trim() && s?.price !== undefined);
   }
 
   await service.save();

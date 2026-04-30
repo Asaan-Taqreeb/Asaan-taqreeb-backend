@@ -204,7 +204,10 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
   }
 
   await booking.save();
-  return booking.populate('vendor', 'name email').populate('service', 'category basicInfo').populate('client', 'name email');
+  await booking.populate('vendor', 'name email');
+  await booking.populate('service', 'category basicInfo');
+  await booking.populate('client', 'name email');
+  return booking;
 };
 
 module.exports = {
