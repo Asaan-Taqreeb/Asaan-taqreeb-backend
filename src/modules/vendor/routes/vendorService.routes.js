@@ -70,6 +70,9 @@ const updateServiceValidation = [
 // Public: get all services
 router.get('/', vendorServiceController.getAllServices);
 
+// Protected (Vendor): get vendor's own services - MUST come before /:id
+router.get('/me', protect, authorize(ROLES.VENDOR), vendorServiceController.getMyServices);
+
 // Public: get single service
 router.get('/:id', vendorServiceController.getServiceById);
 
@@ -81,9 +84,6 @@ router.post(
   [...baseValidation, ...banquetHallExtraValidation, ...cateringExtraValidation],
   vendorServiceController.createService
 );
-
-// Protected (Vendor): get vendor's own services
-router.get('/me', protect, authorize(ROLES.VENDOR), vendorServiceController.getMyServices);
 
 // Protected (Vendor): update service
 router.put(

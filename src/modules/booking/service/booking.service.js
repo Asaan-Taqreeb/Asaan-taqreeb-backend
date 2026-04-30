@@ -128,7 +128,10 @@ const createBooking = async (clientId, payload) => {
     status: 'PENDING',
   });
 
-  return booking.populate('vendor', 'name email').populate('service', 'category basicInfo');
+  // Populate fields after creating booking
+  await booking.populate('vendor', 'name email');
+  await booking.populate('service', 'category basicInfo');
+  return booking;
 };
 
 const getMyBookings = async (clientId) => {
