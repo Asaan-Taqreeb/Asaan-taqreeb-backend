@@ -198,9 +198,18 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
     });
   }
 
-  // If rejected, store rejection reason
-  if (status === 'REJECTED' && rejectionReason) {
-    booking.rejectionReason = rejectionReason;
+  // If rejected or cancelled, remove the availability block
+  if (status === 'REJECTED' || status === 'CANCELLED') {
+    await VendorAvailability.deleteOne({
+      vendor: booking.vendor,
+      date: booking.date,
+      timeSlot: booking.timeSlot,
+      type: 'BOOKED',
+    });
+
+    if (status === 'REJECTED' && rejectionReason) {
+      booking.rejectionReason = rejectionReason;
+    }
   }
 
   await booking.save();
