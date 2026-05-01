@@ -120,6 +120,15 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+const deleteAccount = async (req, res, next) => {
+  try {
+    const result = await authService.deleteAccount(req.user.id);
+    res.status(200).json({ success: true, message: 'Account deleted successfully', data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -130,4 +139,5 @@ module.exports = {
   verifyOtp,
   resetPassword,
   updateProfile,
+  deleteAccount,
 };

@@ -97,6 +97,19 @@ const getUserChats = async (userId) => {
   });
 };
 
+const deleteChat = async (chatId, userId) => {
+  // We delete messages where the user is either sender or receiver
+  // This ensures a user can only delete chats they belong to
+  const result = await Message.deleteMany({
+    chatId,
+    $or: [
+      { senderId: userId },
+      { receiverId: userId }
+    ]
+  });
+  return result;
+};
+
 const sendMessage = async (userId, { chatId, receiverId, bookingId, text }) => {
   if (!chatId || !receiverId || !text) {
     const error = new Error('chatId, receiverId, and text are required');
@@ -160,6 +173,7 @@ const getUnreadCount = async (userId) => {
 module.exports = {
   getChatHistory,
   getUserChats,
+  deleteChat,
   sendMessage,
   markAsRead,
   getUnreadCount,

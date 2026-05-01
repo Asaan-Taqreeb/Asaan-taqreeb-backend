@@ -53,6 +53,7 @@ router.post('/refresh', authController.refresh);
 router.post('/logout', protect, authController.logout);
 router.get('/me', protect, authController.getMe);
 router.put('/me', protect, updateProfileValidation, authController.updateProfile);
+router.delete('/me', protect, authController.deleteAccount);
 
 router.post('/forgot-password', forgotPasswordValidation, authController.forgotPassword);
 router.post('/verify-otp', verifyOtpValidation, authController.verifyOtp);

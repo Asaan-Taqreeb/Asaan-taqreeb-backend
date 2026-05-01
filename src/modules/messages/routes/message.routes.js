@@ -17,6 +17,9 @@ router.get('/', protect, messageController.getUserChats);
 // Protected: get chat history
 router.get('/:chatId', protect, messageController.getChatHistory);
 
+// Protected: delete chat
+router.delete('/:chatId', protect, messageController.deleteChat);
+
 // Protected: send message
 router.post('/', protect, sendMessageValidation, messageController.sendMessage);
 

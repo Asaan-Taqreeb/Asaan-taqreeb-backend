@@ -236,6 +236,18 @@ const updateProfile = async (userId, { name, phone, profileImage }) => {
   return buildUserPayload(user);
 };
 
+const deleteAccount = async (userId) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    const error = new Error('User not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  await User.findByIdAndDelete(userId);
+  return { success: true, message: 'Account deleted successfully' };
+};
+
 module.exports = {
   register,
   login,
@@ -246,4 +258,5 @@ module.exports = {
   verifyOtp,
   resetPassword,
   updateProfile,
+  deleteAccount,
 };

@@ -10,6 +10,15 @@ const getChatHistory = async (req, res, next) => {
   }
 };
 
+const deleteChat = async (req, res, next) => {
+  try {
+    const result = await messageService.deleteChat(req.params.chatId, req.user.id);
+    res.status(200).json({ success: true, message: 'Chat deleted successfully', data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getUserChats = async (req, res, next) => {
   try {
     const chats = await messageService.getUserChats(req.user.id);
@@ -54,6 +63,7 @@ const getUnreadCount = async (req, res, next) => {
 module.exports = {
   getChatHistory,
   getUserChats,
+  deleteChat,
   sendMessage,
   markAsRead,
   getUnreadCount,
