@@ -30,7 +30,7 @@ const vendorAvailabilitySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['BLOCKED', 'BOOKED'],
+      enum: ['BLOCKED', 'BOOKED', 'PENDING_BOOKING'],
       default: 'BLOCKED',
     },
   },
