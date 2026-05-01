@@ -128,6 +128,16 @@ const createBooking = async (clientId, payload) => {
     status: 'PENDING',
   });
 
+  // Block the time slot immediately when booking is created (PENDING status)
+  // This prevents double-booking while vendor is reviewing the request
+  await VendorAvailability.create({
+    vendor: service.user._id,
+    date,
+    timeSlot,
+    reason: 'Booking Pending',
+    type: 'PENDING_BOOKING',
+  });
+
   // Populate fields after creating booking
   await booking.populate('vendor', 'name email');
   await booking.populate('service', 'category basicInfo');
@@ -187,24 +197,33 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
 
   booking.status = status;
 
-  // If approved/confirmed, block the time slot in vendor availability
+  // If approved/confirmed, convert PENDING_BOOKING to BOOKED
   if (status === 'APPROVED' || status === 'CONFIRMED') {
-    await VendorAvailability.create({
-      vendor: booking.vendor,
-      date: booking.date,
-      timeSlot: booking.timeSlot,
-      reason: 'Booking Confirmed',
-      type: 'BOOKED',
-    });
+    // Update the pending booking entry to BOOKED
+    await VendorAvailability.updateOne(
+      {
+        vendor: booking.vendor,
+        date: booking.date,
+        timeSlot: booking.timeSlot,
+        type: 'PENDING_BOOKING',
+      },
+      {
+        type: 'BOOKED',
+        reason: 'Booking Confirmed',
+      }
+    );
   }
 
-  // If rejected or cancelled, remove the availability block
+  // If rejected or cancelled, remove the availability block entirely
   if (status === 'REJECTED' || status === 'CANCELLED') {
     await VendorAvailability.deleteOne({
       vendor: booking.vendor,
       date: booking.date,
       timeSlot: booking.timeSlot,
-      type: 'BOOKED',
+      $or: [
+        { type: 'PENDING_BOOKING' },
+        { type: 'BOOKED' }
+      ],
     });
 
     if (status === 'REJECTED' && rejectionReason) {
