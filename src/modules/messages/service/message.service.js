@@ -68,8 +68,8 @@ const getUserChats = async (userId) => {
 
   // Populate the last message and participant details
   const populatedChats = await Message.populate(chats, [
-    { path: 'lastMessage.senderId', select: 'name email profileImage' },
-    { path: 'lastMessage.receiverId', select: 'name email profileImage' }
+    { path: 'lastMessage.senderId', model: 'User', select: 'name email profileImage' },
+    { path: 'lastMessage.receiverId', model: 'User', select: 'name email profileImage' }
   ]);
 
   return populatedChats.map(chat => {
