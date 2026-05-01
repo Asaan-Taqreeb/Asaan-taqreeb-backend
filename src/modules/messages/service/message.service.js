@@ -73,8 +73,20 @@ const getUserChats = async (userId) => {
   ]);
 
   return populatedChats.map(chat => {
-    const isSender = chat.lastMessage.senderId._id.toString() === userId.toString();
-    const otherUser = isSender ? chat.lastMessage.receiverId : chat.lastMessage.senderId;
+    const senderId = chat.lastMessage.senderId;
+    const receiverId = chat.lastMessage.receiverId;
+
+    if (!senderId || !receiverId) {
+      return {
+        chatId: chat._id,
+        lastMessage: chat.lastMessage,
+        unreadCount: chat.unreadCount,
+        otherUser: { name: 'Unknown User', _id: 'deleted' }
+      };
+    }
+
+    const isSender = senderId._id.toString() === userId.toString();
+    const otherUser = isSender ? receiverId : senderId;
 
     return {
       chatId: chat._id,
