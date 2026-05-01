@@ -47,7 +47,10 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text }) => {
     isRead: false,
   });
 
-  const populatedMessage = await message.populate('senderId', 'name email').populate('receiverId', 'name email');
+  const populatedMessage = await message.populate([
+    { path: 'senderId', select: 'name email' },
+    { path: 'receiverId', select: 'name email' }
+  ]);
 
   // Emit real-time message via socket
   try {
