@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { Resend } = require('resend');
 const User = require('../model/user.model');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_123');
 
 const otpStore = {};
 

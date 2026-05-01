@@ -1,4 +1,6 @@
 const Message = require('../model/message.model');
+const { getIo } = require('../../../config/socket');
+const { createNotification } = require('../../notifications/service/notification.service');
 
 const getChatHistory = async (chatId, userId) => {
   // Verify that the user is part of this conversation
@@ -45,7 +47,29 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text }) => {
     isRead: false,
   });
 
-  return message.populate('senderId', 'name email').populate('receiverId', 'name email');
+  const populatedMessage = await message.populate('senderId', 'name email').populate('receiverId', 'name email');
+
+  // Emit real-time message via socket
+  try {
+    const io = getIo();
+    // Emit to the specific chat room
+    io.to(`chat_${chatId}`).emit('receiveMessage', populatedMessage);
+    // Also emit to the receiver's personal room for global notification if they aren't in the chat screen
+    io.to(receiverId.toString()).emit('newMessageNotification', populatedMessage);
+  } catch (e) {
+    console.log('Socket not ready');
+  }
+
+  // Create notification
+  await createNotification(
+    receiverId,
+    `New Message from ${populatedMessage.senderId.name}`,
+    text.length > 30 ? text.substring(0, 30) + '...' : text,
+    'NEW_MESSAGE',
+    { chatId, bookingId, messageId: message._id }
+  );
+
+  return populatedMessage;
 };
 
 const markAsRead = async (chatId, userId) => {

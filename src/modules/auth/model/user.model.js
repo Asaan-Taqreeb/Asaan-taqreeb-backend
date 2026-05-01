@@ -39,6 +39,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    expoPushToken: {
+      type: String,
+      trim: true,
+    },
     refreshToken: {
       type: String,
       select: false,

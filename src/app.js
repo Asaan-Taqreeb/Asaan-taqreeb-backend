@@ -9,6 +9,7 @@ const vendorRoutes = require('./modules/vendor/routes/vendor.routes');
 const availabilityRoutes = require('./modules/vendor/routes/availability.routes');
 const bookingRoutes = require('./modules/booking/routes/booking.routes');
 const messageRoutes = require('./modules/messages/routes/message.routes');
+const notificationRoutes = require('./modules/notifications/routes/notification.routes');
 const errorHandler = require('./shared/middleware/error.middleware');
 
 const app = express();
@@ -29,6 +30,7 @@ app.use('/api/v1/vendor/availability', availabilityRoutes);
 app.use('/api/v1/vendors', vendorRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/messages', messageRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 app.use('*splat', (req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });

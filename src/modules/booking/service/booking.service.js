@@ -1,8 +1,17 @@
 const Booking = require('../model/booking.model');
 const VendorService = require('../../vendor/model/vendorService.model');
 const VendorAvailability = require('../../vendor/model/vendorAvailability.model');
+const { createNotification } = require('../../notifications/service/notification.service');
 
-const calculatePricing = (category, pkg, guestCount) => {
+const calculatePricing = (category, pkg, guestCount, providedTotal, providedAdvance) => {
+  if (providedTotal !== undefined && providedTotal !== null) {
+    const totalAmount = providedTotal;
+    const advanceAmount = providedAdvance !== undefined && providedAdvance !== null 
+      ? providedAdvance 
+      : Math.floor(totalAmount * 0.5);
+    return { totalAmount, advanceAmount };
+  }
+
   if (category === 'CATERING' && pkg.pricePerHead && guestCount) {
     const totalAmount = pkg.pricePerHead * guestCount;
     const advanceAmount = Math.floor(totalAmount * 0.5);
@@ -63,6 +72,8 @@ const createBooking = async (clientId, payload) => {
     location,
     specialRequests,
     selectedAddons = [],
+    totalAmount,
+    advancePayment,
   } = payload;
 
   const service = await VendorService.findById(serviceId).populate('user', 'name email role');
@@ -103,7 +114,7 @@ const createBooking = async (clientId, payload) => {
     .filter(Boolean)
     .map((a) => ({ name: a.name, price: a.price }));
 
-  const pricing = calculatePricing(category, pkg, guestCount);
+  const pricing = calculatePricing(category, pkg, guestCount, totalAmount, advancePayment);
 
   const booking = await Booking.create({
     client: clientId,
@@ -141,6 +152,16 @@ const createBooking = async (clientId, payload) => {
   // Populate fields after creating booking
   await booking.populate('vendor', 'name email');
   await booking.populate('service', 'category basicInfo');
+  
+  // Create notification for vendor
+  await createNotification(
+    service.user._id,
+    'New Booking Request',
+    `You have a new booking request for ${service.basicInfo.name}.`,
+    'BOOKING_UPDATE',
+    { bookingId: booking._id }
+  );
+  
   return booking;
 };
 
@@ -235,6 +256,34 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
   await booking.populate('vendor', 'name email');
   await booking.populate('service', 'category basicInfo');
   await booking.populate('client', 'name email');
+
+  // Create notification based on status
+  let title = '';
+  let body = '';
+  let notifyUserId = booking.client._id; // Default notify client
+
+  if (status === 'APPROVED' || status === 'CONFIRMED') {
+    title = 'Booking Approved!';
+    body = `Your booking for ${booking.service.basicInfo.name} has been approved.`;
+  } else if (status === 'REJECTED') {
+    title = 'Booking Rejected';
+    body = `Your booking for ${booking.service.basicInfo.name} was rejected.`;
+  } else if (status === 'CANCELLED') {
+    title = 'Booking Cancelled';
+    // If client cancelled, notify vendor (Assuming vendorId here might mean the person calling it, wait: vendorId here is checked against booking.vendor)
+    body = `Your booking for ${booking.service.basicInfo.name} was cancelled.`;
+  }
+
+  if (title) {
+    await createNotification(
+      notifyUserId,
+      title,
+      body,
+      'BOOKING_UPDATE',
+      { bookingId: booking._id, status }
+    );
+  }
+
   return booking;
 };
 
