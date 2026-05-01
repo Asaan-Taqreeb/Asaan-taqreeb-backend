@@ -10,6 +10,15 @@ const getChatHistory = async (req, res, next) => {
   }
 };
 
+const getUserChats = async (req, res, next) => {
+  try {
+    const chats = await messageService.getUserChats(req.user.id);
+    res.status(200).json({ success: true, data: chats });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const sendMessage = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -44,6 +53,7 @@ const getUnreadCount = async (req, res, next) => {
 
 module.exports = {
   getChatHistory,
+  getUserChats,
   sendMessage,
   markAsRead,
   getUnreadCount,

@@ -11,6 +11,9 @@ const sendMessageValidation = [
   body('text').trim().notEmpty().withMessage('Message text is required'),
 ];
 
+// Protected: get all user chats (inbox)
+router.get('/', protect, messageController.getUserChats);
+
 // Protected: get chat history
 router.get('/:chatId', protect, messageController.getChatHistory);
 

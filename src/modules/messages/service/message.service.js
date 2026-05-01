@@ -31,6 +31,59 @@ const getChatHistory = async (chatId, userId) => {
   return messages;
 };
 
+const getUserChats = async (userId) => {
+  const chats = await Message.aggregate([
+    {
+      $match: {
+        $or: [
+          { senderId: new require('mongoose').Types.ObjectId(userId) },
+          { receiverId: new require('mongoose').Types.ObjectId(userId) }
+        ]
+      }
+    },
+    { $sort: { createdAt: -1 } },
+    {
+      $group: {
+        _id: "$chatId",
+        lastMessage: { $first: "$$ROOT" },
+        unreadCount: {
+          $sum: {
+            $cond: [
+              { 
+                $and: [
+                  { $eq: ["$isRead", false] },
+                  { $eq: ["$receiverId", new require('mongoose').Types.ObjectId(userId)] }
+                ]
+              }, 
+              1, 
+              0
+            ]
+          }
+        }
+      }
+    },
+    { $sort: { "lastMessage.createdAt": -1 } }
+  ]);
+
+  // Populate the last message and participant details
+  const populatedChats = await Message.populate(chats, [
+    { path: 'lastMessage.senderId', select: 'name email profileImage' },
+    { path: 'lastMessage.receiverId', select: 'name email profileImage' }
+  ]);
+
+  return populatedChats.map(chat => {
+    const isSender = chat.lastMessage.senderId._id.toString() === userId.toString();
+    const otherUser = isSender ? chat.lastMessage.receiverId : chat.lastMessage.senderId;
+
+    return {
+      chatId: chat._id,
+      lastMessage: chat.lastMessage,
+      unreadCount: chat.unreadCount,
+      otherUser
+    };
+  });
+};
+
 const sendMessage = async (userId, { chatId, receiverId, bookingId, text }) => {
   if (!chatId || !receiverId || !text) {
     const error = new Error('chatId, receiverId, and text are required');
@@ -93,6 +146,7 @@ const getUnreadCount = async (userId) => {
 
 module.exports = {
   getChatHistory,
+  getUserChats,
   sendMessage,
   markAsRead,
   getUnreadCount,
