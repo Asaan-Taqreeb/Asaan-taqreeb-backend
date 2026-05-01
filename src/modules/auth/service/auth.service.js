@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { Resend } = require('resend');
 const User = require('../model/user.model');
+const VendorService = require('../../vendor/model/vendorService.model');
+const Message = require('../../messages/model/message.model');
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_123');
 
@@ -245,7 +247,19 @@ const deleteAccount = async (userId) => {
   }
 
   await User.findByIdAndDelete(userId);
-  return { success: true, message: 'Account deleted successfully' };
+
+  // Cascade delete: Remove associated vendor services if they exist
+  await VendorService.deleteMany({ user: userId });
+
+  // Cascade delete: Remove messages associated with this user
+  await Message.deleteMany({
+    $or: [
+      { senderId: userId },
+      { receiverId: userId }
+    ]
+  });
+
+  return { success: true, message: 'Account and all associated data deleted successfully' };
 };
 
 module.exports = {
