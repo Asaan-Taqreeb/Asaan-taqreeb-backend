@@ -1,6 +1,7 @@
 const Message = require('../model/message.model');
 const { getIo } = require('../../../config/socket');
 const { createNotification } = require('../../notifications/service/notification.service');
+const { Types } = require('mongoose');
 
 const getChatHistory = async (chatId, userId) => {
   // Verify that the user is part of this conversation
@@ -36,8 +37,8 @@ const getUserChats = async (userId) => {
     {
       $match: {
         $or: [
-          { senderId: new require('mongoose').Types.ObjectId(userId) },
-          { receiverId: new require('mongoose').Types.ObjectId(userId) }
+          { senderId: new Types.ObjectId(userId) },
+          { receiverId: new Types.ObjectId(userId) }
         ]
       }
     },
@@ -52,7 +53,7 @@ const getUserChats = async (userId) => {
               { 
                 $and: [
                   { $eq: ["$isRead", false] },
-                  { $eq: ["$receiverId", new require('mongoose').Types.ObjectId(userId)] }
+                  { $eq: ["$receiverId", new Types.ObjectId(userId)] }
                 ]
               }, 
               1, 
