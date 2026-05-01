@@ -54,14 +54,22 @@ const uploadMultipleImages = async (files, folder = 'services') => {
 
 const deleteFromSupabase = async (imageUrl) => {
   try {
-    // Extract file path from URL
-    const url = new URL(imageUrl);
-    const fileName = url.pathname.split('/').pop();
-    const folder = url.pathname.split('/').slice(-2, -1)[0];
-    const filePath = `${folder}/${fileName}`;
+    // Supabase public URLs look like:
+    // https://<project>.supabase.co/storage/v1/object/public/<bucket>/<folder>/<file>
+    const bucketName = process.env.SUPABASE_BUCKET;
+    const marker = `/object/public/${bucketName}/`;
+    const markerIndex = imageUrl.indexOf(marker);
+
+    if (markerIndex === -1) {
+      // URL does not match expected format — skip Supabase delete, just remove from DB
+      console.warn('deleteFromSupabase: unrecognized URL format, skipping storage delete:', imageUrl);
+      return true;
+    }
+
+    const filePath = imageUrl.substring(markerIndex + marker.length);
 
     const { error } = await supabase.storage
-      .from(process.env.SUPABASE_BUCKET)
+      .from(bucketName)
       .remove([filePath]);
 
     if (error) {
