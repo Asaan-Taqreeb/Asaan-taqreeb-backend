@@ -57,16 +57,36 @@ const deleteFromSupabase = async (imageUrl) => {
     // Supabase public URLs look like:
     // https://<project>.supabase.co/storage/v1/object/public/<bucket>/<folder>/<file>
     const bucketName = process.env.SUPABASE_BUCKET;
-    const marker = `/object/public/${bucketName}/`;
-    const markerIndex = imageUrl.indexOf(marker);
 
-    if (markerIndex === -1) {
-      // URL does not match expected format — skip Supabase delete, just remove from DB
+    // Split on the fixed segment to extract everything after /public/
+    const publicSegment = '/storage/v1/object/public/';
+    const publicIndex = imageUrl.indexOf(publicSegment);
+
+    if (publicIndex === -1) {
       console.warn('deleteFromSupabase: unrecognized URL format, skipping storage delete:', imageUrl);
       return true;
     }
 
-    const filePath = imageUrl.substring(markerIndex + marker.length);
+    // After /public/ we have <bucket>/<path...>
+    const afterPublic = imageUrl.substring(publicIndex + publicSegment.length);
+    // Decode URL-encoded characters (e.g. %2F, %20)
+    const afterPublicDecoded = decodeURIComponent(afterPublic);
+
+    // Strip the bucket prefix (case-insensitive match)
+    const bucketPrefix = bucketName + '/';
+    const bucketPrefixLower = bucketPrefix.toLowerCase();
+    const afterPublicLower = afterPublicDecoded.toLowerCase();
+
+    let filePath;
+    if (afterPublicDecoded.startsWith(bucketPrefix)) {
+      filePath = afterPublicDecoded.substring(bucketPrefix.length);
+    } else if (afterPublicLower.startsWith(bucketPrefixLower)) {
+      filePath = afterPublicDecoded.substring(bucketPrefix.length);
+    } else {
+      // URL doesn't start with our bucket name — log and skip
+      console.warn('deleteFromSupabase: URL bucket does not match env bucket, skipping:', imageUrl);
+      return true;
+    }
 
     const { error } = await supabase.storage
       .from(bucketName)

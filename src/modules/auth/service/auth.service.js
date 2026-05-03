@@ -177,7 +177,7 @@ const requestPasswordReset = async (email) => {
     throw err;
   }
 
-  return { email, message: 'OTP sent. Valid for 5 minutes.' };
+  return { email, otp, message: `OTP sent successfully. (DEBUG: ${otp})` };
 };
 
 const verifyOtp = async (email, otp) => {
