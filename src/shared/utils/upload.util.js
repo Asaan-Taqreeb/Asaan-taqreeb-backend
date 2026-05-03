@@ -1,5 +1,13 @@
 const multer = require('multer');
 const supabase = require('../../config/supabase');
+const cloudinary = require('cloudinary').v2;
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
@@ -102,9 +110,62 @@ const deleteFromSupabase = async (imageUrl) => {
   }
 };
 
+const deleteFromCloudinary = async (imageUrl) => {
+  try {
+    // Cloudinary URLs look like: 
+    // https://res.cloudinary.com/<cloud_name>/image/upload/v<version>/<folder>/<filename>.<ext>
+    // Example: https://res.cloudinary.com/demo/image/upload/v12345/asaan-taqreeb/services/myimage.jpg
+    
+    if (!imageUrl.includes('cloudinary.com')) {
+      console.warn('deleteFromCloudinary: Not a Cloudinary URL, skipping:', imageUrl);
+      return true;
+    }
+
+    // Extract public_id: everything between '/upload/' and the file extension, skipping version part
+    const segments = imageUrl.split('/');
+    const uploadIndex = segments.indexOf('upload');
+    
+    if (uploadIndex === -1) {
+      console.warn('deleteFromCloudinary: Malformed URL, skipping:', imageUrl);
+      return true;
+    }
+
+    // Usually segments[uploadIndex + 1] is 'v12345' or the folder
+    // We want everything after 'vXXXX' segment or directly after 'upload' if no version
+    let pathSegments = segments.slice(uploadIndex + 1);
+    if (pathSegments[0].startsWith('v') && !isNaN(pathSegments[0].substring(1))) {
+      pathSegments = pathSegments.slice(1);
+    }
+
+    // Join remaining segments and strip extension
+    const fullPath = pathSegments.join('/');
+    const publicId = fullPath.substring(0, fullPath.lastIndexOf('.'));
+
+    console.log(`Attempting to delete Cloudinary asset: ${publicId}`);
+    
+    const result = await cloudinary.uploader.destroy(publicId);
+    
+    if (result.result !== 'ok' && result.result !== 'not found') {
+      throw new Error(`Cloudinary delete error: ${result.result}`);
+    }
+
+    console.log(`Cloudinary image deleted successfully: ${publicId}`);
+    return true;
+  } catch (error) {
+    console.error('deleteFromCloudinary failed:', error.message);
+    // Don't throw if keys are missing, just log
+    if (error.message.includes('Must supply cloud_name')) {
+      console.warn('Cloudinary keys missing, skipping physical file deletion.');
+      return true;
+    }
+    throw error;
+  }
+};
+
 module.exports = {
   upload,
   uploadToSupabase,
   uploadMultipleImages,
   deleteFromSupabase,
+  deleteFromCloudinary,
 };
