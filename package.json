@@ -21,7 +21,6 @@
   },
   "homepage": "https://github.com/Asaan-Taqreeb/Asaan-taqreeb-backend#readme",
   "dependencies": {
-    "@supabase/supabase-js": "^2.104.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

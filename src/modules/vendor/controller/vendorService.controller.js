@@ -1,6 +1,6 @@
 const { validationResult } = require('express-validator');
 const vendorServiceService = require('../service/vendorService.service');
-const { uploadMultipleImages, deleteFromSupabase, deleteFromCloudinary } = require('../../../shared/utils/upload.util');
+const { uploadMultipleImages, deleteFromCloudinary } = require('../../../shared/utils/upload.util');
 
 const createService = async (req, res, next) => {
   try {
@@ -198,14 +198,8 @@ const deleteImage = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Image URL is required' });
     }
 
-    // Determine storage provider and delete physical file
-    if (imageUrl.includes('cloudinary.com')) {
-      await deleteFromCloudinary(imageUrl);
-    } else if (imageUrl.includes('supabase.co')) {
-      await deleteFromSupabase(imageUrl);
-    } else {
-      console.warn('Unknown storage provider for URL:', imageUrl);
-    }
+    // Call Cloudinary deletion logic
+    await deleteFromCloudinary(imageUrl);
     
     // Remove from database
     const result = await vendorServiceService.removeServiceImage(
@@ -236,4 +230,3 @@ module.exports = {
   uploadImages,
   deleteImage,
 };
-
