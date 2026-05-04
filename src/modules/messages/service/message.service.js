@@ -29,6 +29,10 @@ const getChatHistory = async (chatId, userId) => {
     { isRead: true }
   );
 
+  // Also mark notifications as read
+  const { markChatNotificationsAsRead } = require('../../notifications/service/notification.service');
+  await markChatNotificationsAsRead(userId, chatId);
+
   return messages;
 };
 
@@ -159,6 +163,10 @@ const markAsRead = async (chatId, userId) => {
     { chatId, receiverId: userId, isRead: false },
     { isRead: true }
   );
+
+  // Also mark notifications as read
+  const { markChatNotificationsAsRead } = require('../../notifications/service/notification.service');
+  await markChatNotificationsAsRead(userId, chatId);
 
   return result;
 };

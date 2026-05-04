@@ -31,13 +31,40 @@ const sendExpoPushNotification = async (expoPushToken, title, body, data = {}) =
 
 const createNotification = async (userId, title, body, type = 'SYSTEM', data = {}) => {
   try {
-    const notification = await Notification.create({
-      user: userId,
-      title,
-      body,
-      type,
-      data,
-    });
+    let notification;
+
+    // Handle grouping for NEW_MESSAGE type
+    if (type === 'NEW_MESSAGE' && data.chatId) {
+      const existingNotification = await Notification.findOne({
+        user: userId,
+        type: 'NEW_MESSAGE',
+        isRead: false,
+        'data.chatId': data.chatId,
+      });
+
+      if (existingNotification) {
+        // Update existing notification
+        const currentCount = existingNotification.data.unreadCount || 1;
+        const newCount = currentCount + 1;
+        
+        existingNotification.title = title; // Keep the latest title (usually "New Message from Name")
+        existingNotification.body = `${newCount} new messages`;
+        existingNotification.data = { ...existingNotification.data, ...data, unreadCount: newCount };
+        existingNotification.createdAt = new Date(); // Update timestamp to bring to top
+        
+        notification = await existingNotification.save();
+      }
+    }
+
+    if (!notification) {
+      notification = await Notification.create({
+        user: userId,
+        title,
+        body,
+        type,
+        data: { ...data, unreadCount: 1 },
+      });
+    }
 
     const user = await User.findById(userId);
 
@@ -51,7 +78,10 @@ const createNotification = async (userId, title, body, type = 'SYSTEM', data = {
 
     // Send Push Notification if token exists
     if (user && user.expoPushToken) {
-      await sendExpoPushNotification(user.expoPushToken, title, body, data);
+      const pushBody = type === 'NEW_MESSAGE' && notification.data.unreadCount > 1
+        ? `${notification.data.unreadCount} new messages from ${title.replace('New Message from ', '')}`
+        : body;
+      await sendExpoPushNotification(user.expoPushToken, title, pushBody, data);
     }
 
     return notification;
@@ -91,10 +121,19 @@ const markAllAsRead = async (userId) => {
   return { success: true };
 };
 
+const markChatNotificationsAsRead = async (userId, chatId) => {
+  await Notification.updateMany(
+    { user: userId, type: 'NEW_MESSAGE', 'data.chatId': chatId, isRead: false },
+    { isRead: true }
+  );
+  return { success: true };
+};
+
 module.exports = {
   createNotification,
   getUserNotifications,
   getUnreadCount,
   markAsRead,
   markAllAsRead,
+  markChatNotificationsAsRead,
 };
