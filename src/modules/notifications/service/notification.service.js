@@ -129,6 +129,21 @@ const markChatNotificationsAsRead = async (userId, chatId) => {
   return { success: true };
 };
 
+const deleteNotification = async (notificationId, userId) => {
+  const result = await Notification.deleteOne({ _id: notificationId, user: userId });
+  if (result.deletedCount === 0) {
+    const error = new Error('Notification not found');
+    error.statusCode = 404;
+    throw error;
+  }
+  return { success: true };
+};
+
+const deleteAllNotifications = async (userId) => {
+  await Notification.deleteMany({ user: userId });
+  return { success: true };
+};
+
 module.exports = {
   createNotification,
   getUserNotifications,
@@ -136,4 +151,6 @@ module.exports = {
   markAsRead,
   markAllAsRead,
   markChatNotificationsAsRead,
+  deleteNotification,
+  deleteAllNotifications,
 };

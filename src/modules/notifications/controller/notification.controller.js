@@ -47,10 +47,30 @@ const updatePushToken = async (req, res, next) => {
   }
 };
 
+const deleteNotification = async (req, res, next) => {
+  try {
+    await notificationService.deleteNotification(req.params.id, req.user.id);
+    res.status(200).json({ success: true, message: 'Notification deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteAllNotifications = async (req, res, next) => {
+  try {
+    await notificationService.deleteAllNotifications(req.user.id);
+    res.status(200).json({ success: true, message: 'All notifications deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getMyNotifications,
   getUnreadCount,
   markAsRead,
   markAllAsRead,
   updatePushToken,
+  deleteNotification,
+  deleteAllNotifications,
 };

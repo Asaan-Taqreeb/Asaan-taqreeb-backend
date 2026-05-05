@@ -221,7 +221,8 @@ const resetPassword = async (email, newPassword) => {
   return { email, message: 'Password has been reset successfully.' };
 };
 
-const updateProfile = async (userId, { name, phone, profileImage }) => {
+const updateProfile = async (userId, reqBody) => {
+  const { name, phone, profileImage } = reqBody;
   const user = await User.findById(userId);
   if (!user) {
     const error = new Error('User not found');
@@ -232,6 +233,7 @@ const updateProfile = async (userId, { name, phone, profileImage }) => {
   if (name) user.name = name;
   if (phone) user.phone = phone;
   if (profileImage) user.profileImage = profileImage;
+  if (reqBody.expoPushToken) user.expoPushToken = reqBody.expoPushToken;
 
   await user.save();
 
