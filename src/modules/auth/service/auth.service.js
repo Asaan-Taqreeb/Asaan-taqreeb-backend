@@ -112,13 +112,29 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
+  // Handle unverified email: trigger OTP send if trying to login
+  let otp;
+  if (!user.isEmailVerified) {
+    try {
+      otp = await sendVerificationEmail(user.email);
+      console.log(`Login attempt for unverified user ${user.email}. Sent new OTP.`);
+    } catch (error) {
+      console.error('Failed to send verification OTP during login:', error);
+    }
+  }
+
   const accessToken = generateAccessToken(user._id, user.role);
   const refreshToken = generateRefreshToken(user._id);
 
   user.refreshToken = refreshToken;
   await user.save();
 
-  return { accessToken, refreshToken, user: buildUserPayload(user) };
+  return { 
+    accessToken, 
+    refreshToken, 
+    user: buildUserPayload(user),
+    otp: (process.env.NODE_ENV === 'development' && !user.isEmailVerified) ? otp : undefined 
+  };
 };
 
 const refresh = async (token) => {
@@ -266,12 +282,21 @@ const sendVerificationEmail = async (email) => {
     </div>
   `;
 
-  await resend.emails.send({
-    from: fromEmail,
-    to: email,
-    subject: 'Verification Code for Asaan Taqreeb',
-    html,
-  });
+  try {
+    if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_dummy_123') {
+      await resend.emails.send({
+        from: fromEmail,
+        to: email,
+        subject: 'Verification Code for Asaan Taqreeb',
+        html,
+      });
+      console.log(`Verification email sent to ${email}`);
+    } else {
+      console.warn(`Resend API key missing or dummy. Skipping email send for ${email}. OTP: ${otp}`);
+    }
+  } catch (error) {
+    console.error('Resend error while sending verification OTP:', error);
+  }
   
   return otp;
 };
