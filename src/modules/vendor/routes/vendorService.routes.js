@@ -86,6 +86,13 @@ router.post(
 );
 
 // Protected (Vendor): update service
+router.patch(
+  '/:id',
+  protect,
+  authorize(ROLES.VENDOR),
+  updateServiceValidation,
+  vendorServiceController.updateService
+);
 router.put(
   '/:id',
   protect,
@@ -113,6 +120,13 @@ router.post(
 );
 
 // Protected (Vendor): update package
+router.patch(
+  '/:serviceId/packages/:packageId',
+  protect,
+  authorize(ROLES.VENDOR),
+  packageValidation,
+  vendorServiceController.updatePackage
+);
 router.put(
   '/:serviceId/packages/:packageId',
   protect,
@@ -140,6 +154,13 @@ router.post(
 );
 
 // Protected (Vendor): update optional service
+router.patch(
+  '/:serviceId/optional-services/:addonId',
+  protect,
+  authorize(ROLES.VENDOR),
+  optionalServiceValidation,
+  vendorServiceController.updateOptionalService
+);
 router.put(
   '/:serviceId/optional-services/:addonId',
   protect,

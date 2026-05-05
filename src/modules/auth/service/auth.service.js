@@ -7,7 +7,9 @@ const Message = require('../../messages/model/message.model');
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_123');
 
-const otpStore = {};
+const otpStore = {}; // For password reset
+const verificationOtpStore = {}; // For email verification
+
 
 const generateAccessToken = (userId, role) => {
   return jwt.sign({ id: userId, role }, process.env.JWT_SECRET, {
@@ -26,13 +28,17 @@ const buildUserPayload = (user) => ({
   name: user.name,
   email: user.email,
   role: user.role,
+  isEmailVerified: user.isEmailVerified,
+  is2faEnabled: user.is2faEnabled,
+  verificationStatus: user.verificationStatus,
 });
+
 
 const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
-const register = async ({ name, email, password, role }) => {
+const register = async ({ name, email, password, role, phone }) => {
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     const error = new Error('Email already in use');
@@ -40,7 +46,40 @@ const register = async ({ name, email, password, role }) => {
     throw error;
   }
 
-  const user = await User.create({ name, email, password, role });
+  const user = await User.create({ name, email, password, role, phone });
+
+  // Generate and send verification OTP
+  const otp = generateOTP();
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+  verificationOtpStore[email] = { otp, expiresAt };
+
+  const fromEmail = process.env.RESET_EMAIL_FROM || 'onboarding@resend.dev';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #4F46E5;">Welcome to Asaan Taqreeb!</h2>
+      <p>Please verify your email address to complete your registration.</p>
+      <p>Your Verification Code is:</p>
+      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #4F46E5; margin: 16px 0;">
+        ${otp}
+      </div>
+      <p style="color: #666;">This code is valid for <strong>10 minutes</strong>.</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #aaa;">Sent by Asaan Taqreeb</p>
+    </div>
+  `;
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: email,
+      subject: 'Verify your Asaan Taqreeb account',
+      html,
+    });
+    console.log('Verification OTP sent via Resend:', { email, otp });
+  } catch (error) {
+    console.error('Resend error while sending verification OTP:', error);
+    // We don't throw here to allow user to reach the verification screen and request resend
+  }
 
   const accessToken = generateAccessToken(user._id, user.role);
   const refreshToken = generateRefreshToken(user._id);
@@ -48,8 +87,9 @@ const register = async ({ name, email, password, role }) => {
   user.refreshToken = refreshToken;
   await user.save();
 
-  return { accessToken, refreshToken, user: buildUserPayload(user) };
+  return { accessToken, refreshToken, user: buildUserPayload(user), otp: process.env.NODE_ENV === 'development' ? otp : undefined };
 };
+
 
 const login = async ({ email, password }) => {
   const user = await User.findOne({ email }).select('+password');
@@ -207,6 +247,91 @@ const verifyOtp = async (email, otp) => {
   return { email, message: 'OTP verified successfully.' };
 };
 
+const sendVerificationEmail = async (email) => {
+  const otp = generateOTP();
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+  verificationOtpStore[email] = { otp, expiresAt };
+
+  const fromEmail = process.env.RESET_EMAIL_FROM || 'onboarding@resend.dev';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #4F46E5;">Email Verification Code</h2>
+      <p>Use the following code to verify your Asaan Taqreeb account:</p>
+      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #4F46E5; margin: 16px 0;">
+        ${otp}
+      </div>
+      <p style="color: #666;">This code is valid for <strong>10 minutes</strong>.</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #aaa;">Sent by Asaan Taqreeb</p>
+    </div>
+  `;
+
+  await resend.emails.send({
+    from: fromEmail,
+    to: email,
+    subject: 'Verification Code for Asaan Taqreeb',
+    html,
+  });
+  
+  return otp;
+};
+
+const resendVerificationOtp = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) {
+    const error = new Error('User not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (user.isEmailVerified) {
+    const error = new Error('Email is already verified');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const otp = await sendVerificationEmail(email);
+  return { message: 'Verification code resent successfully', otp: process.env.NODE_ENV === 'development' ? otp : undefined };
+};
+
+const verifyEmail = async (email, otp) => {
+  const record = verificationOtpStore[email];
+
+  if (!record) {
+    const error = new Error('No verification code found. Please request again.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (Date.now() > record.expiresAt) {
+    delete verificationOtpStore[email];
+    const error = new Error('Verification code has expired.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (record.otp !== otp.toString()) {
+    const error = new Error('Invalid verification code.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    const error = new Error('User not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  user.isEmailVerified = true;
+  await user.save();
+
+  delete verificationOtpStore[email];
+
+  return { message: 'Email verified successfully', user: buildUserPayload(user) };
+};
+
+
 const resetPassword = async (email, newPassword) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user) {
@@ -275,4 +400,7 @@ module.exports = {
   resetPassword,
   updateProfile,
   deleteAccount,
+  verifyEmail,
+  resendVerificationOtp,
 };
+

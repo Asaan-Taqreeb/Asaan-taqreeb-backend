@@ -15,7 +15,8 @@ const sendExpoPushNotification = async (expoPushToken, title, body, data = {}) =
   };
 
   try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
+    console.log(`Attempting to send push notification to token: ${expoPushToken}`);
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -24,6 +25,13 @@ const sendExpoPushNotification = async (expoPushToken, title, body, data = {}) =
       },
       body: JSON.stringify(message),
     });
+    
+    const result = await response.json();
+    console.log('Expo Push API Response:', JSON.stringify(result, null, 2));
+
+    if (!response.ok) {
+      console.error('Expo Push API Error Response:', result);
+    }
   } catch (error) {
     console.error('Error sending Expo push notification:', error);
   }
@@ -81,7 +89,8 @@ const createNotification = async (userId, title, body, type = 'SYSTEM', data = {
       const pushBody = type === 'NEW_MESSAGE' && notification.data.unreadCount > 1
         ? `${notification.data.unreadCount} new messages from ${title.replace('New Message from ', '')}`
         : body;
-      await sendExpoPushNotification(user.expoPushToken, title, pushBody, data);
+      // Fire and forget (don't block the main flow)
+      sendExpoPushNotification(user.expoPushToken, title, pushBody, data).catch(e => console.error('Push error:', e));
     }
 
     return notification;

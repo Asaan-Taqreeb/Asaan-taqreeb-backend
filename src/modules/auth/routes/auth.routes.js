@@ -52,11 +52,15 @@ router.post('/login', loginValidation, authController.login);
 router.post('/refresh', authController.refresh);
 router.post('/logout', protect, authController.logout);
 router.get('/me', protect, authController.getMe);
-router.put('/me', protect, updateProfileValidation, authController.updateProfile);
+router.patch('/me', protect, updateProfileValidation, authController.updateProfile);
+router.put('/me', protect, updateProfileValidation, authController.updateProfile); // Keep PUT for backward compatibility
 router.delete('/me', protect, authController.deleteAccount);
 
 router.post('/forgot-password', forgotPasswordValidation, authController.forgotPassword);
 router.post('/verify-otp', verifyOtpValidation, authController.verifyOtp);
 router.post('/reset-password', resetPasswordValidation, authController.resetPassword);
+router.post('/verify-email', verifyOtpValidation, authController.verifyEmail);
+router.post('/resend-verification-otp', forgotPasswordValidation, authController.resendVerificationOtp);
+
 
 module.exports = router;

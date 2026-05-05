@@ -129,6 +129,26 @@ const deleteAccount = async (req, res, next) => {
   }
 };
 
+const verifyEmail = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+    const result = await authService.verifyEmail(email, otp);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const resendVerificationOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const result = await authService.resendVerificationOtp(email);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -140,4 +160,7 @@ module.exports = {
   resetPassword,
   updateProfile,
   deleteAccount,
+  verifyEmail,
+  resendVerificationOtp,
 };
+

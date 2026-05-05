@@ -35,6 +35,33 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    isPhoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+    is2faEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['unverified', 'pending', 'verified', 'rejected'],
+      default: 'unverified',
+    },
+    identityDetails: {
+      cnic: String,
+      idFrontImage: String,
+      idBackImage: String,
+      selfieImage: String,
+      submissionDate: Date,
+      verifiedAt: Date,
+      rejectionReason: String,
+      livenessConfidence: Number,
+    },
     profileImage: {
       type: String,
       trim: true,

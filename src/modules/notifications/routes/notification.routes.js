@@ -8,7 +8,9 @@ router.use(protect);
 
 router.get('/', notificationController.getMyNotifications);
 router.get('/unread-count', notificationController.getUnreadCount);
+router.patch('/:id/read', notificationController.markAsRead);
 router.put('/:id/read', notificationController.markAsRead);
+router.patch('/read-all', notificationController.markAllAsRead);
 router.put('/read-all', notificationController.markAllAsRead);
 router.post('/push-token', notificationController.updatePushToken);
 router.delete('/:id', notificationController.deleteNotification);
