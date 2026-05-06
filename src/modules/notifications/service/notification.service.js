@@ -12,6 +12,8 @@ const sendExpoPushNotification = async (expoPushToken, title, body, data = {}) =
     title,
     body,
     data,
+    channelId: 'default',
+    priority: 'high',
   };
 
   try {

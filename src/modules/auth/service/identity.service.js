@@ -100,7 +100,27 @@ const submitKyc = async (userId, kycData) => {
   user.verificationStatus = 'pending';
   await user.save();
 
-  // Trigger AI Verification in the background
+  // If no ID image is provided, rely purely on liveness confidence
+  if (!idFrontImage) {
+      console.log(`No ID provided. Checking livenessConfidence for fallback: ${livenessConfidence}`);
+      if (livenessConfidence >= 0.7) {
+        user.verificationStatus = 'verified';
+        user.identityDetails.verifiedAt = new Date();
+        user.identityDetails.aiReason = 'Auto-verified via Liveness Fallback (No CNIC Provided)';
+        console.log(`Auto-verified user ${userId} via Liveness Fallback`);
+      } else {
+        user.verificationStatus = 'rejected';
+        user.identityDetails.rejectionReason = 'Facial liveness verification failed';
+      }
+      await user.save();
+      return { 
+        success: true, 
+        message: 'KYC processed using facial liveness',
+        status: user.verificationStatus
+      };
+  }
+
+  // Trigger AI Verification in the background if ID is provided
   verifyIdentityWithAI(userId, idFrontImage, selfieImage).then(async (aiResult) => {
     const userToUpdate = await User.findById(userId);
     if (!userToUpdate) return;
