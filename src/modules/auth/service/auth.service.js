@@ -1,14 +1,27 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const User = require('../model/user.model');
 const VendorService = require('../../vendor/model/vendorService.model');
 const Message = require('../../messages/model/message.model');
 
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_123');
+// Setup Nodemailer Transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
-const otpStore = {}; // For password reset
-const verificationOtpStore = {}; // For email verification
+// Verify connection configuration
+transporter.verify(function (error, success) {
+  if (error) {
+    console.error('Nodemailer connection error:', error);
+  } else {
+    console.log('Nodemailer: Server is ready to take our messages');
+  }
+});
 
 
 const generateAccessToken = (userId, role) => {
@@ -50,10 +63,11 @@ const register = async ({ name, email, password, role, phone }) => {
 
   // Generate and send verification OTP
   const otp = generateOTP();
-  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-  verificationOtpStore[email] = { otp, expiresAt };
+  user.otp = otp;
+  user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  await user.save();
 
-  const fromEmail = process.env.RESET_EMAIL_FROM || 'onboarding@resend.dev';
+  const fromEmail = process.env.EMAIL_USER || 'asaantaqreeb@gmail.com';
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
       <h2 style="color: #4F46E5;">Welcome to Asaan Taqreeb!</h2>
@@ -69,16 +83,15 @@ const register = async ({ name, email, password, role, phone }) => {
   `;
 
   try {
-    await resend.emails.send({
-      from: fromEmail,
+    await transporter.sendMail({
+      from: `"Asaan Taqreeb" <${fromEmail}>`,
       to: email,
       subject: 'Verify your Asaan Taqreeb account',
       html,
     });
-    console.log('Verification OTP sent via Resend:', { email, otp });
+    console.log('Verification OTP sent via Nodemailer:', { email, otp });
   } catch (error) {
-    console.error('Resend error while sending verification OTP:', error);
-    // We don't throw here to allow user to reach the verification screen and request resend
+    console.error('Nodemailer error while sending verification OTP:', error);
   }
 
   const accessToken = generateAccessToken(user._id, user.role);
@@ -116,7 +129,7 @@ const login = async ({ email, password }) => {
   let otp;
   if (!user.isEmailVerified) {
     try {
-      otp = await sendVerificationEmail(user.email);
+      otp = await sendVerificationEmail(user);
       console.log(`Login attempt for unverified user ${user.email}. Sent new OTP.`);
     } catch (error) {
       console.error('Failed to send verification OTP during login:', error);
@@ -198,11 +211,11 @@ const requestPasswordReset = async (email) => {
   }
 
   const otp = generateOTP();
-  const expiresAt = Date.now() + 5 * 60 * 1000;
+  user.otp = otp;
+  user.otpExpires = Date.now() + 5 * 60 * 1000;
+  await user.save();
 
-  otpStore[email] = { otp, expiresAt };
-  const fromEmail = process.env.RESET_EMAIL_FROM || 'onboarding@resend.dev';
-
+  const fromEmail = process.env.EMAIL_USER || 'asaantaqreeb@gmail.com';
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
       <h2 style="color: #4F46E5;">Password Reset Request</h2>
@@ -214,20 +227,20 @@ const requestPasswordReset = async (email) => {
       <p style="color: #666;">This OTP is valid for <strong>5 minutes</strong>.</p>
       <p style="color: #666;">If you did not request this, you can ignore this email.</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-      <p style="font-size: 12px; color: #aaa;">Sent by Asaan Taqreeb — ${fromEmail}</p>
+      <p style="font-size: 12px; color: #aaa;">Sent by Asaan Taqreeb</p>
     </div>
   `;
 
   try {
-    await resend.emails.send({
-      from: fromEmail,
+    await transporter.sendMail({
+      from: `"Asaan Taqreeb" <${fromEmail}>`,
       to: email,
       subject: 'Your OTP for Password Reset',
       html,
     });
-    console.log('Password reset OTP sent via Resend:', { email, otp });
+    console.log('Password reset OTP sent via Nodemailer:', { email, otp });
   } catch (error) {
-    console.error('Resend error while sending OTP:', error);
+    console.error('Nodemailer error while sending OTP:', error);
     const err = new Error('Failed to send OTP email');
     err.statusCode = 500;
     throw err;
@@ -237,38 +250,43 @@ const requestPasswordReset = async (email) => {
 };
 
 const verifyOtp = async (email, otp) => {
-  const record = otpStore[email];
+  const user = await User.findOne({ email });
 
-  if (!record) {
+  if (!user || !user.otp) {
     const error = new Error('No OTP found for this email. Please request again.');
     error.statusCode = 400;
     throw error;
   }
 
-  if (Date.now() > record.expiresAt) {
-    delete otpStore[email];
+  if (Date.now() > user.otpExpires) {
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
     const error = new Error('OTP has expired. Please request a new one.');
     error.statusCode = 400;
     throw error;
   }
 
-  if (record.otp !== otp.toString()) {
+  if (user.otp !== otp.toString()) {
     const error = new Error('Invalid OTP.');
     error.statusCode = 400;
     throw error;
   }
 
-  delete otpStore[email];
+  user.otp = undefined;
+  user.otpExpires = undefined;
+  await user.save();
 
   return { email, message: 'OTP verified successfully.' };
 };
 
-const sendVerificationEmail = async (email) => {
+const sendVerificationEmail = async (user) => {
   const otp = generateOTP();
-  const expiresAt = Date.now() + 10 * 60 * 1000;
-  verificationOtpStore[email] = { otp, expiresAt };
+  user.otp = otp;
+  user.otpExpires = Date.now() + 10 * 60 * 1000;
+  await user.save();
 
-  const fromEmail = process.env.RESET_EMAIL_FROM || 'onboarding@resend.dev';
+  const fromEmail = process.env.EMAIL_USER || 'asaantaqreeb@gmail.com';
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
       <h2 style="color: #4F46E5;">Email Verification Code</h2>
@@ -283,19 +301,15 @@ const sendVerificationEmail = async (email) => {
   `;
 
   try {
-    if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_dummy_123') {
-      await resend.emails.send({
-        from: fromEmail,
-        to: email,
-        subject: 'Verification Code for Asaan Taqreeb',
-        html,
-      });
-      console.log(`Verification email sent to ${email}`);
-    } else {
-      console.warn(`Resend API key missing or dummy. Skipping email send for ${email}. OTP: ${otp}`);
-    }
+    await transporter.sendMail({
+      from: `"Asaan Taqreeb" <${fromEmail}>`,
+      to: user.email,
+      subject: 'Verification Code for Asaan Taqreeb',
+      html,
+    });
+    console.log(`Verification email sent to ${user.email}`);
   } catch (error) {
-    console.error('Resend error while sending verification OTP:', error);
+    console.error('Nodemailer error while sending verification OTP:', error);
   }
   
   return otp;
@@ -315,43 +329,38 @@ const resendVerificationOtp = async (email) => {
     throw error;
   }
 
-  const otp = await sendVerificationEmail(email);
+  const otp = await sendVerificationEmail(user);
   return { message: 'Verification code resent successfully', otp: process.env.NODE_ENV === 'development' ? otp : undefined };
 };
 
 const verifyEmail = async (email, otp) => {
-  const record = verificationOtpStore[email];
+  const user = await User.findOne({ email });
 
-  if (!record) {
+  if (!user || !user.otp) {
     const error = new Error('No verification code found. Please request again.');
     error.statusCode = 400;
     throw error;
   }
 
-  if (Date.now() > record.expiresAt) {
-    delete verificationOtpStore[email];
+  if (Date.now() > user.otpExpires) {
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
     const error = new Error('Verification code has expired.');
     error.statusCode = 400;
     throw error;
   }
 
-  if (record.otp !== otp.toString()) {
+  if (user.otp !== otp.toString()) {
     const error = new Error('Invalid verification code.');
     error.statusCode = 400;
     throw error;
   }
 
-  const user = await User.findOne({ email });
-  if (!user) {
-    const error = new Error('User not found');
-    error.statusCode = 404;
-    throw error;
-  }
-
   user.isEmailVerified = true;
+  user.otp = undefined;
+  user.otpExpires = undefined;
   await user.save();
-
-  delete verificationOtpStore[email];
 
   return { message: 'Email verified successfully', user: buildUserPayload(user) };
 };
