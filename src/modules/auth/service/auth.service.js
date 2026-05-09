@@ -185,7 +185,7 @@ const requestPasswordReset = async (email) => {
     throw err;
   }
 
-  return { email, otp, message: `OTP sent successfully. (DEBUG: ${otp})` };
+  return { email, message: 'OTP sent successfully.' };
 };
 
 const verifyOtp = async (email, otp) => {
