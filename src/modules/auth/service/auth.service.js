@@ -2,7 +2,10 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../model/user.model');
 const VendorService = require('../../vendor/model/vendorService.model');
+const VendorAvailability = require('../../vendor/model/vendorAvailability.model');
 const Message = require('../../messages/model/message.model');
+const Booking = require('../../booking/model/booking.model');
+const Notification = require('../../notifications/model/notification.model');
 const { sendOTPEmail, sendPasswordResetEmail } = require('../../../config/email');
 
 
@@ -27,6 +30,33 @@ const buildUserPayload = (user) => ({
   is2faEnabled: user.is2faEnabled,
   verificationStatus: user.verificationStatus,
 });
+
+const ACCOUNT_DELETE_GRACE_DAYS = Number(process.env.ACCOUNT_DELETE_GRACE_DAYS || 15);
+
+const buildDeleteSchedule = () => {
+  const deletedAt = new Date();
+  const deleteAfter = new Date(deletedAt.getTime() + ACCOUNT_DELETE_GRACE_DAYS * 24 * 60 * 60 * 1000);
+
+  return { deletedAt, deleteAfter };
+};
+
+const purgeUserData = async (userId) => {
+  await Promise.all([
+    VendorService.deleteMany({ user: userId }),
+    VendorAvailability.deleteMany({ vendor: userId }),
+    VendorAvailability.deleteMany({ vendor: userId }),
+    Booking.deleteMany({ $or: [{ vendor: userId }, { client: userId }] }),
+    Message.deleteMany({
+      $or: [
+        { senderId: userId },
+        { receiverId: userId },
+      ],
+    }),
+    Notification.deleteMany({ user: userId }),
+  ]);
+
+  await User.findByIdAndDelete(userId);
+};
 
 
 const generateOTP = () => {
@@ -83,6 +113,11 @@ const login = async ({ email, password }) => {
   if (!user.isActive) {
     const error = new Error('Account is deactivated');
     error.statusCode = 403;
+    error.code = 'ACCOUNT_DEACTIVATED';
+    if (user.deleteAfter) {
+      error.deleteAfter = user.deleteAfter;
+      error.code = 'ACCOUNT_PENDING_PURGE';
+    }
     throw error;
   }
 
@@ -326,20 +361,74 @@ const deleteAccount = async (userId) => {
     throw error;
   }
 
-  await User.findByIdAndDelete(userId);
+  const { deletedAt, deleteAfter } = buildDeleteSchedule();
 
-  // Cascade delete: Remove associated vendor services if they exist
-  await VendorService.deleteMany({ user: userId });
+  user.isActive = false;
+  user.deletedAt = deletedAt;
+  user.deletionRequestedAt = deletedAt;
+  user.deleteAfter = deleteAfter;
+  user.refreshToken = null;
+  user.expoPushToken = undefined;
+  user.fcmToken = undefined;
+  await user.save();
 
-  // Cascade delete: Remove messages associated with this user
-  await Message.deleteMany({
-    $or: [
-      { senderId: userId },
-      { receiverId: userId }
-    ]
-  });
+  return {
+    success: true,
+    message: `Account deactivated. It will be permanently deleted after ${ACCOUNT_DELETE_GRACE_DAYS} days unless restored.`,
+    deleteAfter,
+  };
+};
 
-  return { success: true, message: 'Account and all associated data deleted successfully' };
+const restoreAccount = async ({ email, password }) => {
+  const user = await User.findOne({ email }).select('+password');
+  if (!user) {
+    const error = new Error('User not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (user.isActive) {
+    return { success: true, message: 'Account is already active', user: buildUserPayload(user) };
+  }
+
+  if (!user.deleteAfter || user.deleteAfter <= new Date()) {
+    const error = new Error('Account can no longer be restored');
+    error.statusCode = 410;
+    throw error;
+  }
+
+  const isMatch = await user.comparePassword(password);
+  if (!isMatch) {
+    const error = new Error('Invalid email or password');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  user.isActive = true;
+  user.deletedAt = undefined;
+  user.deleteAfter = undefined;
+  user.deletionRequestedAt = undefined;
+  user.refreshToken = null;
+  await user.save();
+
+  return { success: true, message: 'Account restored successfully', user: buildUserPayload(user) };
+};
+
+const purgeExpiredAccounts = async () => {
+  const now = new Date();
+  const expiredAccounts = await User.find({
+    isActive: false,
+    deleteAfter: { $lte: now },
+  }).select('_id');
+
+  const purgedIds = [];
+
+  for (const account of expiredAccounts) {
+    await purgeUserData(account._id);
+    purgedIds.push(account._id.toString());
+  }
+
+  return { success: true, purgedCount: purgedIds.length, purgedIds };
 };
 
 module.exports = {
@@ -355,5 +444,7 @@ module.exports = {
   deleteAccount,
   verifyEmail,
   resendOtp,
+  restoreAccount,
+  purgeExpiredAccounts,
 };
 

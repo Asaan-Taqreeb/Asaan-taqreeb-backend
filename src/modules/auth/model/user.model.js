@@ -31,6 +31,15 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    deletedAt: {
+      type: Date,
+    },
+    deleteAfter: {
+      type: Date,
+    },
+    deletionRequestedAt: {
+      type: Date,
+    },
     phone: {
       type: String,
       trim: true,

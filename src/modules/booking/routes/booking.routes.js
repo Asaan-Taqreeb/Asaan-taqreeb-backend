@@ -12,7 +12,30 @@ const createBookingValidation = [
     .isIn(['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON'])
     .withMessage('Invalid category'),
   body('packageName').trim().notEmpty().withMessage('packageName is required'),
-  body('guestCount').isInt({ min: 1 }).withMessage('guestCount must be at least 1'),
+  body('guestCount').custom((value, { req }) => {
+    const category = String(req.body.category || '').toUpperCase();
+    const requiresGuestCount = category === 'BANQUET_HALL' || category === 'CATERING';
+
+    if (!requiresGuestCount) {
+      if (value === undefined || value === null || value === '') {
+        return true;
+      }
+      if (Number.isNaN(Number(value)) || Number(value) < 1) {
+        throw new Error('guestCount must be at least 1 when provided');
+      }
+      return true;
+    }
+
+    if (value === undefined || value === null || value === '') {
+      throw new Error('guestCount is required for this category');
+    }
+
+    if (Number.isNaN(Number(value)) || Number(value) < 1) {
+      throw new Error('guestCount must be at least 1');
+    }
+
+    return true;
+  }),
   body('date').notEmpty().withMessage('date is required'),
   body('timeSlot.from').notEmpty().withMessage('timeSlot.from is required'),
   body('timeSlot.to').notEmpty().withMessage('timeSlot.to is required'),

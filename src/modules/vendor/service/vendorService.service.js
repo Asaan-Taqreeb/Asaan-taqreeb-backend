@@ -3,6 +3,10 @@ const VendorAvailability = require('../model/vendorAvailability.model');
 
 const CATEGORIES = ['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON'];
 
+const populateActiveUserQuery = (query) => query.populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } });
+
+const populateActiveUserDoc = (doc) => doc.populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } });
+
 const validateCategoryRules = (category, data) => {
   if (category === 'BANQUET_HALL') {
     if (!data.capacity || !data.capacity.minGuests || !data.capacity.maxGuests) {
@@ -71,21 +75,23 @@ const createVendorService = async (userId, payload) => {
     images: images || [],
   });
 
-  return vendorService.populate('user', 'name email role');
+  return populateActiveUserDoc(vendorService);
 };
 
 const getAllServices = async () => {
-  return VendorService.find().populate('user', 'name email role').lean();
+  const services = await VendorService.find().populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } }).lean();
+  return services.filter((service) => service.user);
 };
 
 const getServicesByUser = async (userId) => {
-  return VendorService.find({ user: userId }).populate('user', 'name email role').lean();
+  const services = await VendorService.find({ user: userId }).populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } }).lean();
+  return services.filter((service) => service.user);
 };
 
 const getServiceById = async (serviceId) => {
-  const service = await VendorService.findById(serviceId).populate('user', 'name email role').lean();
+  const service = await VendorService.findById(serviceId).populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } }).lean();
 
-  if (!service) {
+  if (!service || !service.user) {
     const error = new Error('Service not found');
     error.statusCode = 404;
     throw error;
@@ -132,7 +138,7 @@ const updateService = async (serviceId, vendorId, data) => {
   }
 
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 const deleteService = async (serviceId, vendorId) => {
@@ -171,7 +177,7 @@ const addPackage = async (serviceId, vendorId, packageData) => {
 
   service.packages.push(packageData);
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 const updatePackage = async (serviceId, vendorId, packageId, packageData) => {
@@ -198,7 +204,7 @@ const updatePackage = async (serviceId, vendorId, packageId, packageData) => {
 
   Object.assign(service.packages[pkgIndex], packageData);
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 const deletePackage = async (serviceId, vendorId, packageId) => {
@@ -225,7 +231,7 @@ const deletePackage = async (serviceId, vendorId, packageId) => {
 
   service.packages.splice(pkgIndex, 1);
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 const addOptionalService = async (serviceId, vendorId, serviceData) => {
@@ -245,7 +251,7 @@ const addOptionalService = async (serviceId, vendorId, serviceData) => {
 
   service.optionalServices.push(serviceData);
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 const updateOptionalService = async (serviceId, vendorId, addonId, serviceData) => {
@@ -272,7 +278,7 @@ const updateOptionalService = async (serviceId, vendorId, addonId, serviceData) 
 
   Object.assign(service.optionalServices[addonIndex], serviceData);
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 const deleteOptionalService = async (serviceId, vendorId, addonId) => {
@@ -299,7 +305,7 @@ const deleteOptionalService = async (serviceId, vendorId, addonId) => {
 
   service.optionalServices.splice(addonIndex, 1);
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 const getVendorAvailability = async (vendorId, fromDate, toDate) => {
@@ -375,7 +381,7 @@ const addServiceImages = async (serviceId, vendorId, imageUrls) => {
   // Add new images to existing images array
   service.images.push(...imageUrls);
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 const removeServiceImage = async (serviceId, vendorId, imageUrl) => {
@@ -396,7 +402,7 @@ const removeServiceImage = async (serviceId, vendorId, imageUrl) => {
   // Remove image from images array
   service.images = service.images.filter(img => img !== imageUrl);
   await service.save();
-  return service.populate('user', 'name email role');
+  return populateActiveUserDoc(service);
 };
 
 module.exports = {

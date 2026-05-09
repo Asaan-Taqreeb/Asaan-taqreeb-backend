@@ -129,6 +129,16 @@ const deleteAccount = async (req, res, next) => {
   }
 };
 
+const restoreAccount = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    const result = await authService.restoreAccount({ email, password });
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const verifyEmail = async (req, res, next) => {
   try {
     const { email, otp } = req.body;
@@ -160,6 +170,7 @@ module.exports = {
   resetPassword,
   updateProfile,
   deleteAccount,
+  restoreAccount,
   verifyEmail,
   resendOtp,
 };

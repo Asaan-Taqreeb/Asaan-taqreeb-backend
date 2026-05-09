@@ -41,6 +41,11 @@ const resetPasswordValidation = [
     .withMessage('Password must be at least 6 characters'),
 ];
 
+const restoreAccountValidation = [
+  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+  body('password').notEmpty().withMessage('Password is required'),
+];
+
 const updateProfileValidation = [
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
   body('phone').optional().trim(),
@@ -61,6 +66,7 @@ router.post('/verify-otp', verifyOtpValidation, authController.verifyOtp);
 router.post('/reset-password', resetPasswordValidation, authController.resetPassword);
 router.post('/verify-email', verifyOtpValidation, authController.verifyEmail);
 router.post('/resend-verification-otp', forgotPasswordValidation, authController.resendOtp);
+router.post('/restore-account', restoreAccountValidation, authController.restoreAccount);
 
 
 module.exports = router;

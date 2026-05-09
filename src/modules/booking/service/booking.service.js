@@ -12,7 +12,7 @@ const calculatePricing = (category, pkg, guestCount, providedTotal, providedAdva
     return { totalAmount, advanceAmount };
   }
 
-  if (category === 'CATERING' && pkg.pricePerHead && guestCount) {
+  if ((category === 'CATERING' || category === 'BANQUET_HALL') && pkg.pricePerHead && guestCount) {
     const totalAmount = pkg.pricePerHead * guestCount;
     const advanceAmount = Math.floor(totalAmount * 0.5);
     return { totalAmount, advanceAmount };
@@ -76,8 +76,8 @@ const createBooking = async (clientId, payload) => {
     advancePayment,
   } = payload;
 
-  const service = await VendorService.findById(serviceId).populate('user', 'name email role');
-  if (!service) {
+  const service = await VendorService.findById(serviceId).populate('user', 'name email role isActive');
+  if (!service || !service.user || !service.user.isActive) {
     const error = new Error('Service not found');
     error.statusCode = 404;
     throw error;
@@ -89,8 +89,19 @@ const createBooking = async (clientId, payload) => {
     throw error;
   }
 
-  if (category === 'BANQUET_HALL' && service.capacity && service.capacity.maxGuests) {
-    if (guestCount > service.capacity.maxGuests || guestCount < service.capacity.minGuests) {
+  const requiresGuestCount = category === 'BANQUET_HALL' || category === 'CATERING';
+  const normalizedGuestCount = guestCount !== undefined && guestCount !== null && guestCount !== ''
+    ? Number(guestCount)
+    : undefined;
+
+  if (requiresGuestCount && (!Number.isFinite(normalizedGuestCount) || normalizedGuestCount < 1)) {
+    const error = new Error('guestCount is required for this category');
+    error.statusCode = 422;
+    throw error;
+  }
+
+  if (category === 'BANQUET_HALL' && service.capacity && service.capacity.maxGuests && normalizedGuestCount) {
+    if (normalizedGuestCount > service.capacity.maxGuests || normalizedGuestCount < service.capacity.minGuests) {
       const error = new Error(
         `Guest count must be between ${service.capacity.minGuests} and ${service.capacity.maxGuests}`
       );
@@ -114,7 +125,7 @@ const createBooking = async (clientId, payload) => {
     .filter(Boolean)
     .map((a) => ({ name: a.name, price: a.price }));
 
-  const pricing = calculatePricing(category, pkg, guestCount, totalAmount, advancePayment);
+  const pricing = calculatePricing(category, pkg, normalizedGuestCount, totalAmount, advancePayment);
 
   const booking = await Booking.create({
     client: clientId,
@@ -124,12 +135,12 @@ const createBooking = async (clientId, payload) => {
     selectedPackage: {
       name: pkg.name,
       price: pkg.price,
-      guestCount: guestCount || pkg.guestCount,
+      guestCount: requiresGuestCount ? (normalizedGuestCount || pkg.guestCount) : undefined,
       pricePerHead: pkg.pricePerHead,
       details: pkg.details,
       items: pkg.items,
     },
-    guestCount,
+    guestCount: requiresGuestCount ? normalizedGuestCount : normalizedGuestCount,
     date,
     timeSlot,
     location,

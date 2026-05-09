@@ -70,7 +70,7 @@ const bookingSchema = new mongoose.Schema(
     guestCount: {
       type: Number,
       min: 1,
-      required: true,
+      required: false,
     },
     date: {
       type: String, // ISO date string, e.g. '2026-03-05'
