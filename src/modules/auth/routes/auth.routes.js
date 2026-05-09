@@ -60,7 +60,7 @@ router.post('/forgot-password', forgotPasswordValidation, authController.forgotP
 router.post('/verify-otp', verifyOtpValidation, authController.verifyOtp);
 router.post('/reset-password', resetPasswordValidation, authController.resetPassword);
 router.post('/verify-email', verifyOtpValidation, authController.verifyEmail);
-router.post('/resend-verification-otp', forgotPasswordValidation, authController.resendVerificationOtp);
+router.post('/resend-verification-otp', forgotPasswordValidation, authController.resendOtp);
 
 
 module.exports = router;

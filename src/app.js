@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const { initializeEmailService } = require('./config/email');
 
 const authRoutes = require('./modules/auth/routes/auth.routes');
 const vendorServiceRoutes = require('./modules/vendor/routes/vendorService.routes');
@@ -15,6 +16,11 @@ const identityRoutes = require('./modules/auth/routes/identity.routes');
 const errorHandler = require('./shared/middleware/error.middleware');
 
 const app = express();
+
+// Initialize email service
+initializeEmailService().catch(err => {
+  console.error('Failed to initialize email service at startup');
+});
 
 app.use(helmet());
 app.use(cors());

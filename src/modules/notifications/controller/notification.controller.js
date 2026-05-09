@@ -39,9 +39,18 @@ const markAllAsRead = async (req, res, next) => {
 
 const updatePushToken = async (req, res, next) => {
   try {
-    const { expoPushToken } = req.body;
-    await User.findByIdAndUpdate(req.user.id, { expoPushToken });
-    res.status(200).json({ success: true, message: 'Push token updated successfully' });
+    const { expoPushToken, fcmToken } = req.body;
+    const updateData = {};
+
+    if (expoPushToken) updateData.expoPushToken = expoPushToken;
+    if (fcmToken) updateData.fcmToken = fcmToken;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, message: 'No tokens provided' });
+    }
+
+    await User.findByIdAndUpdate(req.user.id, updateData);
+    res.status(200).json({ success: true, message: 'Push tokens updated successfully' });
   } catch (error) {
     next(error);
   }

@@ -139,10 +139,10 @@ const verifyEmail = async (req, res, next) => {
   }
 };
 
-const resendVerificationOtp = async (req, res, next) => {
+const resendOtp = async (req, res, next) => {
   try {
     const { email } = req.body;
-    const result = await authService.resendVerificationOtp(email);
+    const result = await authService.resendOtp(email);
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -161,6 +161,6 @@ module.exports = {
   updateProfile,
   deleteAccount,
   verifyEmail,
-  resendVerificationOtp,
+  resendOtp,
 };
 

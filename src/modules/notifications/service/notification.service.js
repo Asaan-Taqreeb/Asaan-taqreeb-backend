@@ -1,6 +1,7 @@
 const Notification = require('../model/notification.model');
 const User = require('../../auth/model/user.model');
 const { getIo } = require('../../../config/socket');
+const { sendFCMNotification } = require('../../../config/firebase');
 
 // Send push notification via Expo Push API
 const sendExpoPushNotification = async (expoPushToken, title, body, data = {}) => {
@@ -86,13 +87,41 @@ const createNotification = async (userId, title, body, type = 'SYSTEM', data = {
       console.log('Socket not ready or user offline');
     }
 
-    // Send Push Notification if token exists
-    if (user && user.expoPushToken) {
+    // Send Push Notifications (Expo + FCM) if tokens exist
+    if (user) {
       const pushBody = type === 'NEW_MESSAGE' && notification.data.unreadCount > 1
         ? `${notification.data.unreadCount} new messages from ${title.replace('New Message from ', '')}`
         : body;
+
       // Fire and forget (don't block the main flow)
-      sendExpoPushNotification(user.expoPushToken, title, pushBody, data).catch(e => console.error('Push error:', e));
+      const promises = [];
+
+      // Send Expo Push Notification
+      if (user.expoPushToken) {
+        promises.push(
+          sendExpoPushNotification(user.expoPushToken, title, pushBody, data).catch(e => 
+            console.error('Expo Push error:', e)
+          )
+        );
+      }
+
+      // Send FCM Notification (works outside app)
+      if (user.fcmToken) {
+        promises.push(
+          sendFCMNotification(user.fcmToken, title, pushBody, {
+            ...data,
+            bookingId: data.bookingId || '',
+            chatId: data.chatId || '',
+            userId: userId.toString(),
+            type,
+          }).catch(e => console.error('FCM error:', e))
+        );
+      }
+
+      // Execute all push notifications in parallel
+      if (promises.length > 0) {
+        Promise.all(promises).catch(e => console.error('Error sending notifications:', e));
+      }
     }
 
     return notification;

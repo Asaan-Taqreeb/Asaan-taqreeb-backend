@@ -1,27 +1,9 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const User = require('../model/user.model');
 const VendorService = require('../../vendor/model/vendorService.model');
 const Message = require('../../messages/model/message.model');
-
-// Setup Nodemailer Transporter
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-// Verify connection configuration
-transporter.verify(function (error, success) {
-  if (error) {
-    console.error('Nodemailer connection error:', error);
-  } else {
-    console.log('Nodemailer: Server is ready to take our messages');
-  }
-});
+const { sendOTPEmail, sendPasswordResetEmail } = require('../../../config/email');
 
 
 const generateAccessToken = (userId, role) => {
@@ -67,31 +49,10 @@ const register = async ({ name, email, password, role, phone }) => {
   user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
   await user.save();
 
-  const fromEmail = process.env.EMAIL_USER || 'asaantaqreeb@gmail.com';
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
-      <h2 style="color: #4F46E5;">Welcome to Asaan Taqreeb!</h2>
-      <p>Please verify your email address to complete your registration.</p>
-      <p>Your Verification Code is:</p>
-      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #4F46E5; margin: 16px 0;">
-        ${otp}
-      </div>
-      <p style="color: #666;">This code is valid for <strong>10 minutes</strong>.</p>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-      <p style="font-size: 12px; color: #aaa;">Sent by Asaan Taqreeb</p>
-    </div>
-  `;
-
   try {
-    await transporter.sendMail({
-      from: `"Asaan Taqreeb" <${fromEmail}>`,
-      to: email,
-      subject: 'Verify your Asaan Taqreeb account',
-      html,
-    });
-    console.log('Verification OTP sent via Nodemailer:', { email, otp });
+    await sendOTPEmail(email, otp);
   } catch (error) {
-    console.error('Nodemailer error while sending verification OTP:', error);
+    console.error('Error sending verification OTP:', error.message);
   }
 
   const accessToken = generateAccessToken(user._id, user.role);
@@ -215,32 +176,10 @@ const requestPasswordReset = async (email) => {
   user.otpExpires = Date.now() + 5 * 60 * 1000;
   await user.save();
 
-  const fromEmail = process.env.EMAIL_USER || 'asaantaqreeb@gmail.com';
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
-      <h2 style="color: #4F46E5;">Password Reset Request</h2>
-      <p>We received a request to reset your password for Asaan Taqreeb.</p>
-      <p>Your One-Time Password (OTP) is:</p>
-      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #4F46E5; margin: 16px 0;">
-        ${otp}
-      </div>
-      <p style="color: #666;">This OTP is valid for <strong>5 minutes</strong>.</p>
-      <p style="color: #666;">If you did not request this, you can ignore this email.</p>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-      <p style="font-size: 12px; color: #aaa;">Sent by Asaan Taqreeb</p>
-    </div>
-  `;
-
   try {
-    await transporter.sendMail({
-      from: `"Asaan Taqreeb" <${fromEmail}>`,
-      to: email,
-      subject: 'Your OTP for Password Reset',
-      html,
-    });
-    console.log('Password reset OTP sent via Nodemailer:', { email, otp });
+    await sendPasswordResetEmail(email, otp);
   } catch (error) {
-    console.error('Nodemailer error while sending OTP:', error);
+    console.error('Error sending password reset OTP:', error.message);
     const err = new Error('Failed to send OTP email');
     err.statusCode = 500;
     throw err;
@@ -286,36 +225,16 @@ const sendVerificationEmail = async (user) => {
   user.otpExpires = Date.now() + 10 * 60 * 1000;
   await user.save();
 
-  const fromEmail = process.env.EMAIL_USER || 'asaantaqreeb@gmail.com';
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
-      <h2 style="color: #4F46E5;">Email Verification Code</h2>
-      <p>Use the following code to verify your Asaan Taqreeb account:</p>
-      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #4F46E5; margin: 16px 0;">
-        ${otp}
-      </div>
-      <p style="color: #666;">This code is valid for <strong>10 minutes</strong>.</p>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-      <p style="font-size: 12px; color: #aaa;">Sent by Asaan Taqreeb</p>
-    </div>
-  `;
-
   try {
-    await transporter.sendMail({
-      from: `"Asaan Taqreeb" <${fromEmail}>`,
-      to: user.email,
-      subject: 'Verification Code for Asaan Taqreeb',
-      html,
-    });
-    console.log(`Verification email sent to ${user.email}`);
+    await sendOTPEmail(user.email, otp);
   } catch (error) {
-    console.error('Nodemailer error while sending verification OTP:', error);
+    console.error('Error sending verification OTP:', error.message);
   }
   
   return otp;
 };
 
-const resendVerificationOtp = async (email) => {
+const resendOtp = async (email) => {
   const user = await User.findOne({ email });
   if (!user) {
     const error = new Error('User not found');
@@ -435,6 +354,6 @@ module.exports = {
   updateProfile,
   deleteAccount,
   verifyEmail,
-  resendVerificationOtp,
+  resendOtp,
 };
 

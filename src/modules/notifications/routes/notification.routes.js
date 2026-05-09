@@ -12,7 +12,8 @@ router.patch('/:id/read', notificationController.markAsRead);
 router.put('/:id/read', notificationController.markAsRead);
 router.patch('/read-all', notificationController.markAllAsRead);
 router.put('/read-all', notificationController.markAllAsRead);
-router.post('/push-token', notificationController.updatePushToken);
+router.post('/update-token', notificationController.updatePushToken);
+router.post('/push-token', notificationController.updatePushToken); // Backward compatibility
 router.delete('/:id', notificationController.deleteNotification);
 router.delete('/', notificationController.deleteAllNotifications);
 
