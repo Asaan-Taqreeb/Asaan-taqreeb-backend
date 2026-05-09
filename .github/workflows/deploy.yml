@@ -1,0 +1,21 @@
+name: Remote Deploy
+
+on:
+  push:
+    branches: [ main ] # Only deploys when you push to main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Oracle VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/Asaan-taqreeb-backend
+            git pull origin main
+            npm ci --omit=dev
+            pm2 restart asaan-taqreeb-api --update-env
