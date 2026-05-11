@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const messageService = require('../service/message.service');
+const { uploadToCloudinary } = require('../../../shared/utils/upload.util');
 
 const getChatHistory = async (req, res, next) => {
   try {
@@ -35,7 +36,15 @@ const sendMessage = async (req, res, next) => {
       return res.status(422).json({ success: false, errors: errors.array() });
     }
 
-    const message = await messageService.sendMessage(req.user.id, req.body);
+    let imageUrl = req.body.imageUrl || '';
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file, 'messages');
+    }
+
+    const message = await messageService.sendMessage(req.user.id, {
+      ...req.body,
+      imageUrl,
+    });
     res.status(201).json({ success: true, data: message });
   } catch (error) {
     next(error);
