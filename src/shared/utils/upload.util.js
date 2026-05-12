@@ -3,10 +3,19 @@ const cloudinary = require('cloudinary').v2;
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: (process.env.CLOUDINARY_CLOUD_NAME || '').trim(),
+  api_key: (process.env.CLOUDINARY_API_KEY || '').trim(),
+  api_secret: (process.env.CLOUDINARY_API_SECRET || '').trim(),
 });
+
+// Basic runtime checks to help debug "Invalid Signature" issues
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.warn('Cloudinary keys missing or empty. Ensure .env variables are set (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET).');
+} else {
+  const cloud = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+  const keyPresent = Boolean((process.env.CLOUDINARY_API_KEY || '').trim());
+  console.log(`Cloudinary configured (cloud: ${cloud.length ? cloud[0] + '...' : 'n/a'}, api_key_present: ${keyPresent})`);
+}
 
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
