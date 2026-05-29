@@ -13,6 +13,8 @@ const messageRoutes = require('./modules/messages/routes/message.routes');
 const notificationRoutes = require('./modules/notifications/routes/notification.routes');
 const mediaRoutes = require('./modules/media/routes/media.routes');
 const identityRoutes = require('./modules/auth/routes/identity.routes');
+const favoritesRoutes = require('./modules/favorites/routes/favorites.routes');
+const plannerRoutes = require('./modules/planner/routes/planner.routes');
 const errorHandler = require('./shared/middleware/error.middleware');
 
 const app = express();
@@ -32,6 +34,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ success: true, message: 'Server is running' });
 });
 
+app.use('/api/v1/auth/identity', identityRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/vendor/services', vendorServiceRoutes);
 app.use('/api/v1/vendor/availability', availabilityRoutes);
@@ -41,9 +44,10 @@ app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/notifications/test', require('./modules/notifications/routes/test.routes'));
 app.use('/api/v1/media', mediaRoutes);
-app.use('/api/v1/auth/identity', identityRoutes);
+app.use('/api/v1/favorites', favoritesRoutes);
+app.use('/api/v1/planner', plannerRoutes);
 
-app.use('*splat', (req, res) => {
+app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
