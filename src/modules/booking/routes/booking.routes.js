@@ -66,5 +66,13 @@ router.patch(
   bookingController.updateBookingStatus
 );
 
+// Protected (Client): cancel booking
+router.patch(
+  '/:id/cancel',
+  protect,
+  authorize(ROLES.CLIENT),
+  bookingController.cancelBooking
+);
+
 module.exports = router;
 

@@ -298,11 +298,63 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
   return booking;
 };
 
+const cancelBooking = async (bookingId, clientId) => {
+  const booking = await Booking.findById(bookingId);
+
+  if (!booking) {
+    const error = new Error('Booking not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (booking.client.toString() !== clientId.toString()) {
+    const error = new Error('Not authorized to cancel this booking');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (booking.status !== 'PENDING') {
+    const error = new Error('Cannot cancel a booking that is already processed by the vendor');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  booking.status = 'CANCELLED';
+
+  // Remove the availability block
+  await VendorAvailability.deleteOne({
+    vendor: booking.vendor,
+    date: booking.date,
+    timeSlot: booking.timeSlot,
+    $or: [
+      { type: 'PENDING_BOOKING' },
+      { type: 'BOOKED' }
+    ],
+  });
+
+  await booking.save();
+  await booking.populate('vendor', 'name email');
+  await booking.populate('service', 'category basicInfo');
+  await booking.populate('client', 'name email');
+
+  // Notify vendor
+  await createNotification(
+    booking.vendor._id,
+    'Booking Cancelled by Client',
+    `The booking request for ${booking.service.basicInfo.name} was cancelled by the client.`,
+    'BOOKING_UPDATE',
+    { bookingId: booking._id, status: 'CANCELLED' }
+  );
+
+  return booking;
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
   getVendorBookings,
   getBookingById,
   updateBookingStatus,
+  cancelBooking,
 };
 

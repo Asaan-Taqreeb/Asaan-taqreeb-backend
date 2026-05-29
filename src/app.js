@@ -15,6 +15,7 @@ const mediaRoutes = require('./modules/media/routes/media.routes');
 const identityRoutes = require('./modules/auth/routes/identity.routes');
 const favoritesRoutes = require('./modules/favorites/routes/favorites.routes');
 const plannerRoutes = require('./modules/planner/routes/planner.routes');
+const reviewRoutes = require('./modules/reviews/routes/review.routes');
 const errorHandler = require('./shared/middleware/error.middleware');
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/v1/notifications/test', require('./modules/notifications/routes/te
 app.use('/api/v1/media', mediaRoutes);
 app.use('/api/v1/favorites', favoritesRoutes);
 app.use('/api/v1/planner', plannerRoutes);
+app.use('/api/v1/reviews', reviewRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });

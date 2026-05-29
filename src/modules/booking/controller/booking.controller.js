@@ -53,10 +53,20 @@ const updateBookingStatus = async (req, res, next) => {
   }
 };
 
+const cancelBooking = async (req, res, next) => {
+  try {
+    const booking = await bookingService.cancelBooking(req.params.id, req.user.id);
+    res.status(200).json({ success: true, data: booking });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
   getVendorBookings,
   updateBookingStatus,
+  cancelBooking,
 };
 
