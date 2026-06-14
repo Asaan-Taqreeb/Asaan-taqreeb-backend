@@ -24,7 +24,7 @@ const protect = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Account is deactivated' });
     }
 
-    req.user = { id: user._id, role: user.role };
+    req.user = { id: user._id, role: decoded.role || user.role };
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Not authorized, invalid token' });

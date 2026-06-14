@@ -27,6 +27,11 @@ const userSchema = new mongoose.Schema(
       enum: Object.values(ROLES),
       default: ROLES.CLIENT,
     },
+    roles: {
+      type: [String],
+      enum: Object.values(ROLES),
+      default: [ROLES.CLIENT],
+    },
     isActive: {
       type: Boolean,
       default: true,

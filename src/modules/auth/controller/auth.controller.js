@@ -35,8 +35,8 @@ const login = async (req, res, next) => {
 
 const refresh = async (req, res, next) => {
   try {
-    const { refreshToken } = req.body;
-    const result = await authService.refresh(refreshToken);
+    const { refreshToken, role } = req.body;
+    const result = await authService.refresh(refreshToken, role);
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -54,7 +54,7 @@ const logout = async (req, res, next) => {
 
 const getMe = async (req, res, next) => {
   try {
-    const user = await authService.getMe(req.user.id);
+    const user = await authService.getMe(req.user.id, req.user.role);
     res.status(200).json({ success: true, data: user });
   } catch (error) {
     next(error);

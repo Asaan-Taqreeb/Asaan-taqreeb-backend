@@ -26,6 +26,7 @@ const buildUserPayload = (user) => ({
   name: user.name,
   email: user.email,
   role: user.role,
+  roles: user.roles && user.roles.length > 0 ? user.roles : [user.role],
   isEmailVerified: user.isEmailVerified,
   is2faEnabled: user.is2faEnabled,
   verificationStatus: user.verificationStatus,
@@ -63,15 +64,60 @@ const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
-const register = async ({ name, email, password, role, phone }) => {
-  const existingUser = await User.findOne({ email });
+const register = async ({ name, email, password, role, phone, activateVendor }) => {
+  const existingUser = await User.findOne({ email }).select('+password');
   if (existingUser) {
+    const userRoles = existingUser.roles && existingUser.roles.length > 0 ? existingUser.roles : [existingUser.role];
+    if (role === 'vendor' && userRoles.includes('client') && !userRoles.includes('vendor')) {
+      if (activateVendor) {
+        // Verify the password
+        const isMatch = await existingUser.comparePassword(password);
+        if (!isMatch) {
+          const error = new Error('Invalid password for your existing client account.');
+          error.statusCode = 401;
+          throw error;
+        }
+
+        // Activate vendor role
+        if (!existingUser.roles || existingUser.roles.length === 0) {
+          existingUser.roles = [existingUser.role];
+        }
+        existingUser.roles.push('vendor');
+        existingUser.role = 'vendor';
+        existingUser.verificationStatus = 'unverified';
+        await existingUser.save();
+
+        const accessToken = generateAccessToken(existingUser._id, 'vendor');
+        const refreshToken = generateRefreshToken(existingUser._id);
+        existingUser.refreshToken = refreshToken;
+        await existingUser.save();
+
+        return {
+          accessToken,
+          refreshToken,
+          user: buildUserPayload(existingUser),
+        };
+      } else {
+        const error = new Error('It looks like you already have a client account! Would you like to activate your vendor dashboard using these credentials?');
+        error.statusCode = 409;
+        error.code = 'CLIENT_ACCOUNT_EXISTS';
+        throw error;
+      }
+    }
+
     const error = new Error('Email already in use');
     error.statusCode = 409;
     throw error;
   }
 
-  const user = await User.create({ name, email, password, role, phone });
+  const user = await User.create({
+    name,
+    email,
+    password,
+    role,
+    roles: [role],
+    phone,
+  });
 
   // Generate and send verification OTP
   const otp = generateOTP();
@@ -95,7 +141,7 @@ const register = async ({ name, email, password, role, phone }) => {
 };
 
 
-const login = async ({ email, password }) => {
+const login = async ({ email, password, role }) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user) {
     const error = new Error('Invalid email or password');
@@ -121,6 +167,17 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
+  // Determine active role for token generation
+  let activeRole = role || user.role;
+  if (role) {
+    const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
+    if (!userRoles.includes(role)) {
+      const error = new Error(`User does not have the '${role}' role`);
+      error.statusCode = 403;
+      throw error;
+    }
+  }
+
   // Handle unverified email: trigger OTP send if trying to login
   let otp;
   if (!user.isEmailVerified) {
@@ -132,21 +189,24 @@ const login = async ({ email, password }) => {
     }
   }
 
-  const accessToken = generateAccessToken(user._id, user.role);
+  const accessToken = generateAccessToken(user._id, activeRole);
   const refreshToken = generateRefreshToken(user._id);
 
   user.refreshToken = refreshToken;
   await user.save();
 
+  const userPayload = buildUserPayload(user);
+  userPayload.role = activeRole; // Override with session-specific active role
+
   return { 
     accessToken, 
     refreshToken, 
-    user: buildUserPayload(user),
+    user: userPayload,
     otp: (process.env.NODE_ENV === 'development' && !user.isEmailVerified) ? otp : undefined 
   };
 };
 
-const refresh = async (token) => {
+const refresh = async (token, role) => {
   if (!token) {
     const error = new Error('Refresh token is required');
     error.statusCode = 401;
@@ -175,7 +235,17 @@ const refresh = async (token) => {
     throw error;
   }
 
-  const newAccessToken = generateAccessToken(user._id, user.role);
+  let activeRole = role || user.role;
+  if (role) {
+    const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
+    if (!userRoles.includes(role)) {
+      const error = new Error(`User does not have the '${role}' role`);
+      error.statusCode = 403;
+      throw error;
+    }
+  }
+
+  const newAccessToken = generateAccessToken(user._id, activeRole);
   const newRefreshToken = generateRefreshToken(user._id);
 
   user.refreshToken = newRefreshToken;
@@ -188,14 +258,18 @@ const logout = async (userId) => {
   await User.findByIdAndUpdate(userId, { refreshToken: null });
 };
 
-const getMe = async (userId) => {
+const getMe = async (userId, activeRole) => {
   const user = await User.findById(userId);
   if (!user) {
     const error = new Error('User not found');
     error.statusCode = 404;
     throw error;
   }
-  return user;
+  const payload = buildUserPayload(user);
+  if (activeRole) {
+    payload.role = activeRole;
+  }
+  return payload;
 };
 
 const requestPasswordReset = async (email) => {
