@@ -92,8 +92,12 @@ const sendEmail = async (to, subject, html) => {
   }
 
   try {
+    const fromName = process.env.EMAIL_FROM_NAME;
+    const fromAddress = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    const from = fromName ? `"${fromName}" <${fromAddress}>` : fromAddress;
+
     const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      from,
       to,
       subject,
       html,
