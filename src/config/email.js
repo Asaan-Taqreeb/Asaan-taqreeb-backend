@@ -39,6 +39,8 @@ const initializeEmailService = async () => {
       transportConfig.host = process.env.EMAIL_HOST;
       transportConfig.port = parseInt(process.env.EMAIL_PORT || '587', 10);
       transportConfig.secure = process.env.EMAIL_SECURE === 'true'; // true for port 465, false for 587/other
+    } else if (process.env.EMAIL_SERVICE) {
+      transportConfig.service = process.env.EMAIL_SERVICE;
     } else {
       const emailLower = process.env.EMAIL_USER.toLowerCase();
       if (
@@ -91,7 +93,7 @@ const sendEmail = async (to, subject, html) => {
 
   try {
     const info = await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
       to,
       subject,
       html,
