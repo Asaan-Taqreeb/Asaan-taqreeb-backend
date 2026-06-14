@@ -14,16 +14,15 @@ const initializeEmailService = async () => {
   }
   if (!process.env.EMAIL_PASS) {
     console.error('❌ EMAIL_PASS not set in .env file');
-    console.log('   For Gmail: Use an App Password (not regular password)');
-    console.log('   1. Enable 2-Factor Authentication on your Gmail account');
-    console.log('   2. Go to myaccount.google.com/apppasswords');
-    console.log('   3. Create an app password and copy it to EMAIL_PASS in .env');
+    console.log('   For Gmail / Outlook / Hotmail: Use an App Password (not your regular password)');
+    console.log('   1. Enable 2-Factor Authentication on your email account');
+    console.log('   2. Generate an App Password in your account security settings');
+    console.log('   3. Copy it to EMAIL_PASS in your .env file');
     return false;
   }
 
   try {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
+    const transportConfig = {
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -34,7 +33,30 @@ const initializeEmailService = async () => {
         rateDelta: 20000, // 20 seconds
         rateLimit: 5, // 5 messages per rateDelta
       },
-    });
+    };
+
+    if (process.env.EMAIL_HOST) {
+      transportConfig.host = process.env.EMAIL_HOST;
+      transportConfig.port = parseInt(process.env.EMAIL_PORT || '587', 10);
+      transportConfig.secure = process.env.EMAIL_SECURE === 'true'; // true for port 465, false for 587/other
+    } else {
+      const emailLower = process.env.EMAIL_USER.toLowerCase();
+      if (
+        emailLower.endsWith('@outlook.com') ||
+        emailLower.endsWith('@hotmail.com') ||
+        emailLower.endsWith('@live.com') ||
+        emailLower.endsWith('@office365.com')
+      ) {
+        transportConfig.host = 'smtp.office365.com';
+        transportConfig.port = 587;
+        transportConfig.secure = false; // TLS
+      } else {
+        // Default to Gmail
+        transportConfig.service = 'gmail';
+      }
+    }
+
+    transporter = nodemailer.createTransport(transportConfig);
 
     // Verify connection
     const verified = await transporter.verify();
@@ -46,10 +68,10 @@ const initializeEmailService = async () => {
   } catch (error) {
     console.error('❌ Failed to initialize email service:', error.message);
     console.log('\n📋 Troubleshooting:');
-    console.log('   1. Verify EMAIL_USER is a valid Gmail address');
-    console.log('   2. Use an App Password (not your Gmail password)');
+    console.log('   1. Verify EMAIL_USER is correct');
+    console.log('   2. Use an App Password (not your regular password)');
     console.log('   3. Enable 2-Factor Authentication first');
-    console.log('   4. Check your Gmail security settings');
+    console.log('   4. Check security settings in your email provider (e.g. Gmail / Outlook)');
     return false;
   }
 };
