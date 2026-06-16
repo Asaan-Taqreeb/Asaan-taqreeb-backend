@@ -64,7 +64,7 @@ const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
-const register = async ({ name, email, password, role, phone, activateVendor }) => {
+const register = async ({ name, email, password, role, phone, activateVendor, activateClient }) => {
   const existingUser = await User.findOne({ email }).select('+password');
   if (existingUser) {
     const userRoles = existingUser.roles && existingUser.roles.length > 0 ? existingUser.roles : [existingUser.role];
@@ -101,6 +101,42 @@ const register = async ({ name, email, password, role, phone, activateVendor }) 
         const error = new Error('It looks like you already have a client account! Would you like to activate your vendor dashboard using these credentials?');
         error.statusCode = 409;
         error.code = 'CLIENT_ACCOUNT_EXISTS';
+        throw error;
+      }
+    }
+
+    if (role === 'client' && userRoles.includes('vendor') && !userRoles.includes('client')) {
+      if (activateClient || activateVendor) {
+        // Verify the password
+        const isMatch = await existingUser.comparePassword(password);
+        if (!isMatch) {
+          const error = new Error('Invalid password for your existing vendor account.');
+          error.statusCode = 401;
+          throw error;
+        }
+
+        // Activate client role
+        if (!existingUser.roles || existingUser.roles.length === 0) {
+          existingUser.roles = [existingUser.role];
+        }
+        existingUser.roles.push('client');
+        existingUser.role = 'client';
+        await existingUser.save();
+
+        const accessToken = generateAccessToken(existingUser._id, 'client');
+        const refreshToken = generateRefreshToken(existingUser._id);
+        existingUser.refreshToken = refreshToken;
+        await existingUser.save();
+
+        return {
+          accessToken,
+          refreshToken,
+          user: buildUserPayload(existingUser),
+        };
+      } else {
+        const error = new Error('It looks like you already have a vendor account! Would you like to activate your client dashboard using these credentials?');
+        error.statusCode = 409;
+        error.code = 'VENDOR_ACCOUNT_EXISTS';
         throw error;
       }
     }
