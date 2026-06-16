@@ -68,5 +68,13 @@ router.post('/verify-email', verifyOtpValidation, authController.verifyEmail);
 router.post('/resend-verification-otp', forgotPasswordValidation, authController.resendOtp);
 router.post('/restore-account', restoreAccountValidation, authController.restoreAccount);
 
+router.get('/inspect/:email', async (req, res) => {
+  try {
+    const user = await require('../model/user.model').findOne({ email: req.params.email });
+    res.json({ success: true, user });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
 
 module.exports = router;
