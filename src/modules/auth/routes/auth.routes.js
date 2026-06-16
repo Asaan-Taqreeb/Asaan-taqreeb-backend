@@ -68,37 +68,5 @@ router.post('/verify-email', verifyOtpValidation, authController.verifyEmail);
 router.post('/resend-verification-otp', forgotPasswordValidation, authController.resendOtp);
 router.post('/restore-account', restoreAccountValidation, authController.restoreAccount);
 
-router.get('/inspect/:email', async (req, res) => {
-  try {
-    const user = await require('../model/user.model').findOne({ email: req.params.email });
-    res.json({ success: true, user });
-  } catch (err) {
-    res.json({ success: false, error: err.message });
-  }
-});
-
-router.get('/fix/:email', async (req, res) => {
-  try {
-    const User = require('../model/user.model');
-    const user = await User.findOne({ email: req.params.email });
-    if (user) {
-      if (!user.roles || user.roles.length === 0) {
-        user.roles = [user.role || 'client'];
-      }
-      if (!user.roles.includes('vendor') && user.role === 'vendor') {
-        user.roles.push('vendor');
-      }
-      if (!user.roles.includes('client') && user.role === 'client') {
-        user.roles.push('client');
-      }
-      await user.save();
-      res.json({ success: true, message: "User roles fixed successfully", user });
-    } else {
-      res.json({ success: false, message: "User not found" });
-    }
-  } catch (err) {
-    res.json({ success: false, error: err.message });
-  }
-});
 
 module.exports = router;
