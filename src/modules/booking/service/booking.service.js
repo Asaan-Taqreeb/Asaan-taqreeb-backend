@@ -205,7 +205,7 @@ const getBookingById = async (bookingId) => {
   return booking;
 };
 
-const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason = null) => {
+const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason = null, paidAmount = null) => {
   const booking = await Booking.findById(bookingId);
 
   if (!booking) {
@@ -228,6 +228,12 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
   }
 
   booking.status = status;
+
+  if (status === 'APPROVED') {
+    booking.paidAmount = paidAmount !== null && paidAmount !== undefined ? Number(paidAmount) : booking.pricing.advanceAmount;
+  } else if (status === 'CONFIRMED') {
+    booking.paidAmount = booking.pricing.totalAmount;
+  }
 
   // If approved/confirmed, convert PENDING_BOOKING to BOOKED
   if (status === 'APPROVED' || status === 'CONFIRMED') {
@@ -349,6 +355,106 @@ const cancelBooking = async (bookingId, clientId) => {
   return booking;
 };
 
+const recordRemainingPayment = async (bookingId, vendorId) => {
+  const booking = await Booking.findById(bookingId);
+
+  if (!booking) {
+    const error = new Error('Booking not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (booking.vendor.toString() !== vendorId.toString()) {
+    const error = new Error('Not authorized to update this booking');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  booking.paidAmount = booking.pricing.totalAmount;
+  booking.status = 'CONFIRMED';
+
+  // Update availability blocks to BOOKED
+  await VendorAvailability.updateOne(
+    {
+      vendor: booking.vendor,
+      date: booking.date,
+      timeSlot: booking.timeSlot,
+      type: 'PENDING_BOOKING',
+    },
+    {
+      type: 'BOOKED',
+      reason: 'Booking Confirmed',
+    }
+  );
+
+  await booking.save();
+  await booking.populate('vendor', 'name email');
+  await booking.populate('service', 'category basicInfo');
+  await booking.populate('client', 'name email');
+
+  // Notify client of full payment received
+  await createNotification(
+    booking.client._id,
+    'Payment Received',
+    `Full payment of PKR ${booking.pricing.totalAmount.toLocaleString()} has been received for ${booking.service.basicInfo.name}.`,
+    'BOOKING_UPDATE',
+    { bookingId: booking._id, status: 'CONFIRMED' }
+  );
+
+  return booking;
+};
+
+const sendPaymentReminders = async () => {
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    
+    // Find APPROVED bookings where date is in the past and reminder not sent yet
+    const bookings = await Booking.find({
+      status: 'APPROVED',
+      date: { $lt: todayStr },
+      paymentReminderSent: { $ne: true }
+    })
+    .populate('client', 'name email')
+    .populate('vendor', 'name email')
+    .populate('service', 'basicInfo');
+
+    console.log(`[Reminders] Found ${bookings.length} past-due bookings requiring payment reminders.`);
+
+    for (const booking of bookings) {
+      const remainingAmount = booking.pricing.totalAmount - booking.paidAmount;
+      if (remainingAmount <= 0) continue;
+
+      const packageName = booking.selectedPackage?.name || 'Package';
+      const serviceName = booking.service?.basicInfo?.name || 'Service';
+      const clientName = booking.client?.name || 'Client';
+
+      // Send to Client
+      await createNotification(
+        booking.client._id,
+        'Payment Due Reminder',
+        `Reminder: Please clear the remaining balance of PKR ${remainingAmount.toLocaleString()} for your booking of ${packageName} on ${booking.date}.`,
+        'BOOKING_UPDATE',
+        { bookingId: booking._id }
+      );
+
+      // Send to Vendor
+      await createNotification(
+        booking.vendor._id,
+        'Collect Remaining Payment',
+        `Reminder: Please collect the remaining balance of PKR ${remainingAmount.toLocaleString()} from ${clientName} for their booking of ${packageName} on ${booking.date}.`,
+        'BOOKING_UPDATE',
+        { bookingId: booking._id }
+      );
+
+      booking.paymentReminderSent = true;
+      await booking.save();
+      console.log(`[Reminders] Payment reminder sent for booking ID: ${booking._id}`);
+    }
+  } catch (error) {
+    console.error('[Reminders] Error running payment reminders:', error);
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -356,5 +462,7 @@ module.exports = {
   getBookingById,
   updateBookingStatus,
   cancelBooking,
+  recordRemainingPayment,
+  sendPaymentReminders,
 };
 

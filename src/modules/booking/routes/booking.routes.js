@@ -46,6 +46,7 @@ const updateStatusValidation = [
     .isIn(['PENDING', 'CONFIRMED', 'APPROVED', 'REJECTED', 'CANCELLED'])
     .withMessage('Invalid status'),
   body('rejectionReason').optional().trim(),
+  body('paidAmount').optional().isNumeric().withMessage('paidAmount must be a number'),
 ];
 
 // Protected (Client): create booking
@@ -64,6 +65,14 @@ router.patch(
   authorize(ROLES.VENDOR),
   updateStatusValidation,
   bookingController.updateBookingStatus
+);
+
+// Protected (Vendor): record remaining payment
+router.patch(
+  '/:id/record-payment',
+  protect,
+  authorize(ROLES.VENDOR),
+  bookingController.recordRemainingPayment
 );
 
 // Protected (Client): cancel booking

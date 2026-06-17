@@ -40,12 +40,25 @@ const updateBookingStatus = async (req, res, next) => {
       return res.status(422).json({ success: false, errors: errors.array() });
     }
 
-    const { status, rejectionReason } = req.body;
+    const { status, rejectionReason, paidAmount } = req.body;
     const booking = await bookingService.updateBookingStatus(
       req.params.id,
       req.user.id,
       status,
-      rejectionReason
+      rejectionReason,
+      paidAmount
+    );
+    res.status(200).json({ success: true, data: booking });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const recordRemainingPayment = async (req, res, next) => {
+  try {
+    const booking = await bookingService.recordRemainingPayment(
+      req.params.id,
+      req.user.id
     );
     res.status(200).json({ success: true, data: booking });
   } catch (error) {
@@ -68,5 +81,6 @@ module.exports = {
   getVendorBookings,
   updateBookingStatus,
   cancelBooking,
+  recordRemainingPayment,
 };
 

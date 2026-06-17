@@ -96,6 +96,14 @@ const bookingSchema = new mongoose.Schema(
       type: pricingSchema,
       required: true,
     },
+    paidAmount: {
+      type: Number,
+      default: 0,
+    },
+    paymentReminderSent: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
       enum: ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED', 'APPROVED'],
