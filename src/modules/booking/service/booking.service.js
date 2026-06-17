@@ -245,7 +245,13 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
   booking.status = status;
 
   if (status === 'APPROVED') {
-    booking.paidAmount = paidAmount !== null && paidAmount !== undefined ? Number(paidAmount) : getBookingAdvanceAmount(booking);
+    const finalPaidAmount = paidAmount !== null && paidAmount !== undefined ? Number(paidAmount) : getBookingAdvanceAmount(booking);
+    if (isNaN(finalPaidAmount) || finalPaidAmount <= 0) {
+      const error = new Error('Token/Advance payment amount must be greater than 0 to approve booking.');
+      error.statusCode = 400;
+      throw error;
+    }
+    booking.paidAmount = finalPaidAmount;
   } else if (status === 'CONFIRMED') {
     booking.paidAmount = getBookingTotalAmount(booking);
   }
