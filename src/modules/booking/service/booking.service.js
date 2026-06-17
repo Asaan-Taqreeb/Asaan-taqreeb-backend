@@ -23,6 +23,21 @@ const calculatePricing = (category, pkg, guestCount, providedTotal, providedAdva
   return { totalAmount, advanceAmount };
 };
 
+const getBookingTotalAmount = (booking) => {
+  if (booking && booking.pricing && booking.pricing.totalAmount !== undefined && booking.pricing.totalAmount !== null) {
+    return booking.pricing.totalAmount;
+  }
+  return booking.totalAmount || booking.price || booking.amount || (booking.selectedPackage && booking.selectedPackage.price) || 0;
+};
+
+const getBookingAdvanceAmount = (booking) => {
+  if (booking && booking.pricing && booking.pricing.advanceAmount !== undefined && booking.pricing.advanceAmount !== null) {
+    return booking.pricing.advanceAmount;
+  }
+  return booking.advancePayment || booking.advanceAmount || Math.floor(getBookingTotalAmount(booking) * 0.5);
+};
+
+
 // Check for time slot conflicts
 const checkTimeSlotConflict = async (vendorId, date, timeSlot) => {
   // Check for blocked availability or existing bookings
@@ -230,9 +245,9 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
   booking.status = status;
 
   if (status === 'APPROVED') {
-    booking.paidAmount = paidAmount !== null && paidAmount !== undefined ? Number(paidAmount) : booking.pricing.advanceAmount;
+    booking.paidAmount = paidAmount !== null && paidAmount !== undefined ? Number(paidAmount) : getBookingAdvanceAmount(booking);
   } else if (status === 'CONFIRMED') {
-    booking.paidAmount = booking.pricing.totalAmount;
+    booking.paidAmount = getBookingTotalAmount(booking);
   }
 
   // If approved/confirmed, convert PENDING_BOOKING to BOOKED
@@ -370,7 +385,7 @@ const recordRemainingPayment = async (bookingId, vendorId) => {
     throw error;
   }
 
-  booking.paidAmount = booking.pricing.totalAmount;
+  booking.paidAmount = getBookingTotalAmount(booking);
   booking.status = 'CONFIRMED';
 
   // Update availability blocks to BOOKED
@@ -396,7 +411,7 @@ const recordRemainingPayment = async (bookingId, vendorId) => {
   await createNotification(
     booking.client._id,
     'Payment Received',
-    `Full payment of PKR ${booking.pricing.totalAmount.toLocaleString()} has been received for ${booking.service.basicInfo.name}.`,
+    `Full payment of PKR ${getBookingTotalAmount(booking).toLocaleString()} has been received for ${booking.service.basicInfo.name}.`,
     'BOOKING_UPDATE',
     { bookingId: booking._id, status: 'CONFIRMED' }
   );
@@ -421,7 +436,7 @@ const sendPaymentReminders = async () => {
     console.log(`[Reminders] Found ${bookings.length} past-due bookings requiring payment reminders.`);
 
     for (const booking of bookings) {
-      const remainingAmount = booking.pricing.totalAmount - booking.paidAmount;
+      const remainingAmount = getBookingTotalAmount(booking) - booking.paidAmount;
       if (remainingAmount <= 0) continue;
 
       const packageName = booking.selectedPackage?.name || 'Package';
