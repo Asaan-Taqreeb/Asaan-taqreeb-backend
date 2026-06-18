@@ -122,6 +122,8 @@ const updateService = async (serviceId, vendorId, data) => {
     if (basicInfo.location) service.basicInfo.location = basicInfo.location;
     if (basicInfo.landmark !== undefined) service.basicInfo.landmark = basicInfo.landmark;
     if (basicInfo.about !== undefined) service.basicInfo.about = basicInfo.about;
+    if (basicInfo.latitude !== undefined) service.basicInfo.latitude = basicInfo.latitude;
+    if (basicInfo.longitude !== undefined) service.basicInfo.longitude = basicInfo.longitude;
   }
 
   if (capacity) {

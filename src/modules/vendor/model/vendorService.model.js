@@ -85,6 +85,12 @@ const vendorServiceSchema = new mongoose.Schema(
         type: String,
         trim: true,
       },
+      latitude: {
+        type: Number,
+      },
+      longitude: {
+        type: Number,
+      },
     },
     capacity: {
       minGuests: {
