@@ -316,7 +316,10 @@ const requestPasswordReset = async (email) => {
     throw error;
   }
 
-  const otp = generateOTP();
+  let otp = user.otp;
+  if (!otp || !user.otpExpires || Date.now() + 60 * 1000 > user.otpExpires) {
+    otp = generateOTP();
+  }
   user.otp = otp;
   user.otpExpires = Date.now() + 5 * 60 * 1000;
   await user.save();
@@ -365,7 +368,10 @@ const verifyOtp = async (email, otp) => {
 };
 
 const sendVerificationEmail = async (user) => {
-  const otp = generateOTP();
+  let otp = user.otp;
+  if (!otp || !user.otpExpires || Date.now() + 60 * 1000 > user.otpExpires) {
+    otp = generateOTP();
+  }
   user.otp = otp;
   user.otpExpires = Date.now() + 10 * 60 * 1000;
   await user.save();
