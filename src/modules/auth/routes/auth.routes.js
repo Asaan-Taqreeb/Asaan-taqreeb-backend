@@ -39,6 +39,7 @@ const resetPasswordValidation = [
   body('newPassword')
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters'),
+  body('token').notEmpty().withMessage('Verification token is required'),
 ];
 
 const restoreAccountValidation = [

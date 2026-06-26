@@ -73,7 +73,7 @@ const register = async ({ name, email, password, role, phone, activateVendor, ac
         // Verify the password
         const isMatch = await existingUser.comparePassword(password);
         if (!isMatch) {
-          const error = new Error('Invalid password for your existing client account.');
+          const error = new Error('Incorrect password. Since client and vendor profiles share the same email, they must use the same password. Please enter your existing client account password to activate your vendor dashboard.');
           error.statusCode = 401;
           throw error;
         }
@@ -110,7 +110,7 @@ const register = async ({ name, email, password, role, phone, activateVendor, ac
         // Verify the password
         const isMatch = await existingUser.comparePassword(password);
         if (!isMatch) {
-          const error = new Error('Invalid password for your existing vendor account.');
+          const error = new Error('Incorrect password. Since client and vendor profiles share the same email, they must use the same password. Please enter your existing vendor account password to activate your client dashboard.');
           error.statusCode = 401;
           throw error;
         }
@@ -360,11 +360,15 @@ const verifyOtp = async (email, otp) => {
     throw error;
   }
 
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+
   user.otp = undefined;
   user.otpExpires = undefined;
   await user.save();
 
-  return { email, message: 'OTP verified successfully.' };
+  return { email, message: 'OTP verified successfully.', resetToken };
 };
 
 const sendVerificationEmail = async (user) => {
@@ -436,15 +440,30 @@ const verifyEmail = async (email, otp) => {
 };
 
 
-const resetPassword = async (email, newPassword) => {
-  const user = await User.findOne({ email }).select('+password');
+const resetPassword = async (email, newPassword, token) => {
+  if (!token) {
+    const error = new Error('Verification token is required');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = await User.findOne({
+    email,
+    resetPasswordToken: hashedToken,
+    resetPasswordExpires: { $gt: Date.now() },
+  }).select('+password +resetPasswordToken +resetPasswordExpires');
+
   if (!user) {
-    const error = new Error('User with this email does not exist');
-    error.statusCode = 404;
+    const error = new Error('Invalid or expired password reset token');
+    error.statusCode = 400;
     throw error;
   }
 
   user.password = newPassword;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
   await user.save();
 
   return { email, message: 'Password has been reset successfully.' };

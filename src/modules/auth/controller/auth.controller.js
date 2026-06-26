@@ -98,8 +98,8 @@ const resetPassword = async (req, res, next) => {
       return res.status(422).json({ success: false, errors: errors.array() });
     }
 
-    const { email, newPassword } = req.body;
-    const result = await authService.resetPassword(email, newPassword);
+    const { email, newPassword, token } = req.body;
+    const result = await authService.resetPassword(email, newPassword, token);
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);

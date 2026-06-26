@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const mediaController = require('../controllers/media.controller');
-// const { protect } = require('../../auth/middleware/auth.middleware'); // Optional: protect this route
+const { protect } = require('../../../shared/middleware/auth.middleware');
 
-router.post('/delete', mediaController.deleteImage);
+router.post('/delete', protect, mediaController.deleteImage);
 
 module.exports = router;

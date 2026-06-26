@@ -1,6 +1,7 @@
 const express = require('express');
 const identityController = require('../controller/identity.controller');
-const { protect } = require('../../../shared/middleware/auth.middleware');
+const { protect, authorize } = require('../../../shared/middleware/auth.middleware');
+const ROLES = require('../../../shared/enums/roles.enum');
 
 const router = express.Router();
 
@@ -10,6 +11,6 @@ router.post('/submit', identityController.submitKyc);
 router.get('/status', identityController.getKycStatus);
 
 // Admin route to approve/reject (could be moved to a separate admin module later)
-router.patch('/review', identityController.updateKycStatus);
+router.patch('/review', authorize(ROLES.ADMIN), identityController.updateKycStatus);
 
 module.exports = router;
