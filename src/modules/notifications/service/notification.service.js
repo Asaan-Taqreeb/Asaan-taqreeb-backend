@@ -2,6 +2,37 @@ const Notification = require('../model/notification.model');
 const User = require('../../auth/model/user.model');
 const { getIo } = require('../../../config/socket');
 const { sendFCMNotification } = require('../../../config/firebase');
+const webpush = require('web-push');
+
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY || 'BG8KjEMYvfQBC6u-85YWGfV7ntxPkeMFV5lgfuXxIUa7dMofvkAuM1sfiA_TTuWJw3rVvrNM8rFTBVjd7Zx9XaA';
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || 'AWA4GflPTx3gDAvfLH0BCIitOCSjBrqDPMA2pcMwwxQ';
+
+try {
+  webpush.setVapidDetails(
+    'mailto:support@asaantaqreeb.com',
+    publicVapidKey,
+    privateVapidKey
+  );
+  console.log('✅ Web Push VAPID configuration loaded');
+} catch (error) {
+  console.error('❌ Failed to set VAPID details:', error.message);
+}
+
+// Send push notification via Web Push (PWA)
+const sendWebPushNotification = async (subscription, title, body, data = {}) => {
+  if (!subscription) return;
+  try {
+    const payload = JSON.stringify({
+      title,
+      body,
+      data,
+    });
+    await webpush.sendNotification(subscription, payload);
+    console.log('✅ Web Push notification sent successfully');
+  } catch (error) {
+    console.error('❌ Error sending Web Push:', error.message);
+  }
+};
 
 // Send push notification via Expo Push API
 const sendExpoPushNotification = async (expoPushToken, title, body, data = {}) => {
@@ -115,6 +146,19 @@ const createNotification = async (userId, title, body, type = 'SYSTEM', data = {
             userId: userId.toString(),
             type,
           }).catch(e => console.error('FCM error:', e))
+        );
+      }
+
+      // Send Web Push Notification (PWA)
+      if (user.webPushSubscription) {
+        promises.push(
+          sendWebPushNotification(user.webPushSubscription, title, pushBody, {
+            ...data,
+            bookingId: data.bookingId || '',
+            chatId: data.chatId || '',
+            userId: userId.toString(),
+            type,
+          }).catch(e => console.error('Web Push error:', e))
         );
       }
 

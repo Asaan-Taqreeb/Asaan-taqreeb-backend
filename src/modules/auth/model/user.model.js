@@ -94,6 +94,9 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    webPushSubscription: {
+      type: mongoose.Schema.Types.Mixed,
+    },
     refreshToken: {
       type: String,
       select: false,

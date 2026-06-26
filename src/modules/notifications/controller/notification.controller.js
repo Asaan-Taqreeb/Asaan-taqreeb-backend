@@ -39,11 +39,12 @@ const markAllAsRead = async (req, res, next) => {
 
 const updatePushToken = async (req, res, next) => {
   try {
-    const { expoPushToken, fcmToken } = req.body;
+    const { expoPushToken, fcmToken, webPushSubscription } = req.body;
     const updateData = {};
 
     if (expoPushToken) updateData.expoPushToken = expoPushToken;
     if (fcmToken) updateData.fcmToken = fcmToken;
+    if (webPushSubscription) updateData.webPushSubscription = webPushSubscription;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ success: false, message: 'No tokens provided' });
