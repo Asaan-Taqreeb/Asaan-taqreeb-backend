@@ -125,11 +125,22 @@ const createBooking = async (clientId, payload) => {
     }
   }
 
-  const pkg = service.packages.find((p) => p.name === packageName);
+  let pkg = service.packages.find((p) => p.name === packageName);
   if (!pkg) {
-    const error = new Error('Selected package not found for this service');
-    error.statusCode = 400;
-    throw error;
+    if (totalAmount !== undefined && totalAmount !== null) {
+      pkg = {
+        name: packageName || 'Custom Package',
+        price: totalAmount,
+        guestCount: normalizedGuestCount,
+        pricePerHead: (category === 'CATERING' || category === 'BANQUET_HALL') && normalizedGuestCount ? Math.round(totalAmount / normalizedGuestCount) : undefined,
+        details: 'Custom Package',
+        items: [],
+      };
+    } else {
+      const error = new Error('Selected package not found for this service');
+      error.statusCode = 400;
+      throw error;
+    }
   }
 
   // Check for time slot conflicts BEFORE creating booking
