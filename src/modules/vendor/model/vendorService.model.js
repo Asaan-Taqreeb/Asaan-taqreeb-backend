@@ -54,6 +54,36 @@ const optionalServiceSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const branchSchema = new mongoose.Schema(
+  {
+    id: {
+      type: String,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    location: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    latitude: {
+      type: Number,
+    },
+    longitude: {
+      type: Number,
+    },
+    operatingHours: {
+      from: { type: String, default: '09:00 AM' },
+      to: { type: String, default: '09:00 PM' },
+    },
+  },
+  { _id: false }
+);
+
 const vendorServiceSchema = new mongoose.Schema(
   {
     user: {
@@ -120,6 +150,10 @@ const vendorServiceSchema = new mongoose.Schema(
     },
     images: {
       type: [String],
+      default: [],
+    },
+    branches: {
+      type: [branchSchema],
       default: [],
     },
   },

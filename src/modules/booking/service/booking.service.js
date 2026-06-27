@@ -39,15 +39,23 @@ const getBookingAdvanceAmount = (booking) => {
 
 
 // Check for time slot conflicts
-const checkTimeSlotConflict = async (vendorId, date, timeSlot) => {
+const checkTimeSlotConflict = async (vendorId, date, timeSlot, branchId) => {
   // Check for blocked availability or existing bookings
-  const conflict = await VendorAvailability.findOne({
+  const query = {
     vendor: vendorId,
     date,
     $or: [
       { 'timeSlot.from': { $lt: timeSlot.to }, 'timeSlot.to': { $gt: timeSlot.from } },
     ],
-  });
+  };
+  
+  if (branchId) {
+    query.branchId = branchId;
+  } else {
+    query.$or.push({ branchId: null }, { branchId: { $exists: false } }, { branchId: '' });
+  }
+
+  const conflict = await VendorAvailability.findOne(query);
 
   if (conflict) {
     const error = new Error(
@@ -58,14 +66,22 @@ const checkTimeSlotConflict = async (vendorId, date, timeSlot) => {
   }
 
   // Also check for existing confirmed bookings
-  const bookingConflict = await Booking.findOne({
+  const bookingQuery = {
     vendor: vendorId,
     date,
     status: { $in: ['CONFIRMED', 'APPROVED'] },
     $or: [
       { 'timeSlot.from': { $lt: timeSlot.to }, 'timeSlot.to': { $gt: timeSlot.from } },
     ],
-  });
+  };
+
+  if (branchId) {
+    bookingQuery.branchId = branchId;
+  } else {
+    bookingQuery.$or.push({ branchId: null }, { branchId: { $exists: false } }, { branchId: '' });
+  }
+
+  const bookingConflict = await Booking.findOne(bookingQuery);
 
   if (bookingConflict) {
     const error = new Error(
@@ -89,6 +105,8 @@ const createBooking = async (clientId, payload) => {
     selectedAddons = [],
     totalAmount,
     advancePayment,
+    branchId,
+    branchName,
   } = payload;
 
   const service = await VendorService.findById(serviceId).populate('user', 'name email role isActive');
@@ -144,7 +162,7 @@ const createBooking = async (clientId, payload) => {
   }
 
   // Check for time slot conflicts BEFORE creating booking
-  await checkTimeSlotConflict(service.user._id, date, timeSlot);
+  await checkTimeSlotConflict(service.user._id, date, timeSlot, branchId);
 
   const addons = selectedAddons
     .map((name) => service.optionalServices.find((a) => a.name === name))
@@ -174,6 +192,8 @@ const createBooking = async (clientId, payload) => {
     optionalAddons: addons,
     pricing,
     status: 'PENDING',
+    branchId: branchId || undefined,
+    branchName: branchName || undefined,
   });
 
   // Block the time slot immediately when booking is created (PENDING status)
@@ -184,6 +204,7 @@ const createBooking = async (clientId, payload) => {
     timeSlot,
     reason: 'Booking Pending',
     type: 'PENDING_BOOKING',
+    branchId: branchId || undefined,
   });
 
   // Populate fields after creating booking
@@ -270,13 +291,17 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
   // If approved/confirmed, convert PENDING_BOOKING to BOOKED
   if (status === 'APPROVED' || status === 'CONFIRMED') {
     // Update the pending booking entry to BOOKED
+    const query = {
+      vendor: booking.vendor,
+      date: booking.date,
+      timeSlot: booking.timeSlot,
+      type: 'PENDING_BOOKING',
+    };
+    if (booking.branchId) {
+      query.branchId = booking.branchId;
+    }
     await VendorAvailability.updateOne(
-      {
-        vendor: booking.vendor,
-        date: booking.date,
-        timeSlot: booking.timeSlot,
-        type: 'PENDING_BOOKING',
-      },
+      query,
       {
         type: 'BOOKED',
         reason: 'Booking Confirmed',
@@ -286,7 +311,7 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
 
   // If rejected or cancelled, remove the availability block entirely
   if (status === 'REJECTED' || status === 'CANCELLED') {
-    await VendorAvailability.deleteOne({
+    const query = {
       vendor: booking.vendor,
       date: booking.date,
       timeSlot: booking.timeSlot,
@@ -294,7 +319,11 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
         { type: 'PENDING_BOOKING' },
         { type: 'BOOKED' }
       ],
-    });
+    };
+    if (booking.branchId) {
+      query.branchId = booking.branchId;
+    }
+    await VendorAvailability.deleteOne(query);
 
     if (status === 'REJECTED' && rejectionReason) {
       booking.rejectionReason = rejectionReason;
@@ -360,7 +389,7 @@ const cancelBooking = async (bookingId, clientId) => {
   booking.status = 'CANCELLED';
 
   // Remove the availability block
-  await VendorAvailability.deleteOne({
+  const query = {
     vendor: booking.vendor,
     date: booking.date,
     timeSlot: booking.timeSlot,
@@ -368,7 +397,11 @@ const cancelBooking = async (bookingId, clientId) => {
       { type: 'PENDING_BOOKING' },
       { type: 'BOOKED' }
     ],
-  });
+  };
+  if (booking.branchId) {
+    query.branchId = booking.branchId;
+  }
+  await VendorAvailability.deleteOne(query);
 
   await booking.save();
   await booking.populate('vendor', 'name email');
@@ -406,13 +439,17 @@ const recordRemainingPayment = async (bookingId, vendorId) => {
   booking.status = 'CONFIRMED';
 
   // Update availability blocks to BOOKED
+  const query = {
+    vendor: booking.vendor,
+    date: booking.date,
+    timeSlot: booking.timeSlot,
+    type: 'PENDING_BOOKING',
+  };
+  if (booking.branchId) {
+    query.branchId = booking.branchId;
+  }
   await VendorAvailability.updateOne(
-    {
-      vendor: booking.vendor,
-      date: booking.date,
-      timeSlot: booking.timeSlot,
-      type: 'PENDING_BOOKING',
-    },
+    query,
     {
       type: 'BOOKED',
       reason: 'Booking Confirmed',

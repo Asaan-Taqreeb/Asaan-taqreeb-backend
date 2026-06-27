@@ -33,12 +33,16 @@ const vendorAvailabilitySchema = new mongoose.Schema(
       enum: ['BLOCKED', 'BOOKED', 'PENDING_BOOKING'],
       default: 'BLOCKED',
     },
+    branchId: {
+      type: String,
+      required: false,
+    },
   },
   { timestamps: true }
 );
 
 // Compound index for fast availability lookup
-vendorAvailabilitySchema.index({ vendor: 1, date: 1 });
+vendorAvailabilitySchema.index({ vendor: 1, date: 1, branchId: 1 });
 
 const VendorAvailability = mongoose.model('VendorAvailability', vendorAvailabilitySchema);
 

@@ -84,6 +84,12 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    branchId: {
+      type: String,
+    },
+    branchName: {
+      type: String,
+    },
     specialRequests: {
       type: String,
       trim: true,

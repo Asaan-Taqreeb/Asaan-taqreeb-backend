@@ -43,7 +43,7 @@ const validateCategoryRules = (category, data) => {
 };
 
 const createVendorService = async (userId, payload) => {
-  const { category, basicInfo, capacity, packages, optionalServices, images } = payload;
+  const { category, basicInfo, capacity, packages, optionalServices, images, branches } = payload;
 
   if (!CATEGORIES.includes(category)) {
     const error = new Error(`Category must be one of: ${CATEGORIES.join(', ')}`);
@@ -73,6 +73,7 @@ const createVendorService = async (userId, payload) => {
     packages: packages || [],
     optionalServices: optionalServices || [],
     images: images || [],
+    branches: branches || [],
   });
 
   return populateActiveUserDoc(vendorService);
@@ -115,7 +116,7 @@ const updateService = async (serviceId, vendorId, data) => {
     throw error;
   }
 
-  const { basicInfo, capacity, images, optionalServices } = data;
+  const { basicInfo, capacity, images, optionalServices, branches } = data;
 
   if (basicInfo) {
     if (basicInfo.name) service.basicInfo.name = basicInfo.name;
@@ -139,6 +140,10 @@ const updateService = async (serviceId, vendorId, data) => {
 
   if (optionalServices !== undefined && Array.isArray(optionalServices)) {
     service.optionalServices = optionalServices.filter((s) => s?.name?.trim() && s?.price !== undefined);
+  }
+
+  if (branches !== undefined && Array.isArray(branches)) {
+    service.branches = branches;
   }
 
   await service.save();
@@ -312,8 +317,14 @@ const deleteOptionalService = async (serviceId, vendorId, addonId) => {
   return populateActiveUserDoc(service);
 };
 
-const getVendorAvailability = async (vendorId, fromDate, toDate) => {
+const getVendorAvailability = async (vendorId, fromDate, toDate, branchId) => {
   const query = { vendor: vendorId };
+
+  if (branchId) {
+    query.branchId = branchId;
+  } else {
+    query.$or = [{ branchId: null }, { branchId: { $exists: false } }, { branchId: '' }];
+  }
 
   if (fromDate || toDate) {
     query.date = {};
@@ -324,25 +335,34 @@ const getVendorAvailability = async (vendorId, fromDate, toDate) => {
   return VendorAvailability.find(query).sort({ date: 1 }).lean();
 };
 
-const blockAvailability = async (vendorId, date, timeSlot, reason) => {
+const blockAvailability = async (vendorId, date, timeSlot, reason, branchId) => {
   const availability = await VendorAvailability.create({
     vendor: vendorId,
     date,
     timeSlot,
     reason: reason || 'Blocked',
     type: 'BLOCKED',
+    branchId: branchId || undefined,
   });
 
   return availability;
 };
 
-const unblockAvailability = async (vendorId, date, timeSlot) => {
-  const result = await VendorAvailability.deleteOne({
+const unblockAvailability = async (vendorId, date, timeSlot, branchId) => {
+  const query = {
     vendor: vendorId,
     date,
     'timeSlot.from': timeSlot.from,
     'timeSlot.to': timeSlot.to,
-  });
+  };
+
+  if (branchId) {
+    query.branchId = branchId;
+  } else {
+    query.$or = [{ branchId: null }, { branchId: { $exists: false } }, { branchId: '' }];
+  }
+
+  const result = await VendorAvailability.deleteOne(query);
 
   if (result.deletedCount === 0) {
     const error = new Error('Availability record not found');
@@ -353,8 +373,8 @@ const unblockAvailability = async (vendorId, date, timeSlot) => {
   return { message: 'Availability unblocked successfully' };
 };
 
-const isTimeSlotAvailable = async (vendorId, date, timeSlot) => {
-  const conflict = await VendorAvailability.findOne({
+const isTimeSlotAvailable = async (vendorId, date, timeSlot, branchId) => {
+  const query = {
     vendor: vendorId,
     date,
     $or: [
@@ -362,7 +382,15 @@ const isTimeSlotAvailable = async (vendorId, date, timeSlot) => {
       { 'timeSlot.from': { $lt: timeSlot.to }, 'timeSlot.to': { $gte: timeSlot.to } },
       { 'timeSlot.from': { $gte: timeSlot.from }, 'timeSlot.to': { $lte: timeSlot.to } },
     ],
-  });
+  };
+
+  if (branchId) {
+    query.branchId = branchId;
+  } else {
+    query.$or = [{ branchId: null }, { branchId: { $exists: false } }, { branchId: '' }];
+  }
+
+  const conflict = await VendorAvailability.findOne(query);
 
   return !conflict;
 };
