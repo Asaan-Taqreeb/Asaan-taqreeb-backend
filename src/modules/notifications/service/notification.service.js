@@ -237,4 +237,5 @@ module.exports = {
   markChatNotificationsAsRead,
   deleteNotification,
   deleteAllNotifications,
+  sendExpoPushNotification,
 };
