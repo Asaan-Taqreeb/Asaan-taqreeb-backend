@@ -30,6 +30,15 @@ const initializeFirebase = () => {
       return null;
     }
 
+    if (serviceAccount) {
+      if (typeof serviceAccount.private_key === 'string') {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
+      if (typeof serviceAccount.privateKey === 'string') {
+        serviceAccount.privateKey = serviceAccount.privateKey.replace(/\\n/g, '\n');
+      }
+    }
+
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id,

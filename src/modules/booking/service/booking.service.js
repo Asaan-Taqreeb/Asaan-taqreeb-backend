@@ -498,22 +498,26 @@ const sendPaymentReminders = async () => {
       const clientName = booking.client?.name || 'Client';
 
       // Send to Client
-      await createNotification(
-        booking.client._id,
-        'Payment Due Reminder',
-        `Reminder: Please clear the remaining balance of PKR ${remainingAmount.toLocaleString()} for your booking of ${packageName} on ${booking.date}.`,
-        'BOOKING_UPDATE',
-        { bookingId: booking._id }
-      );
+      if (booking.client && booking.client._id) {
+        await createNotification(
+          booking.client._id,
+          'Payment Due Reminder',
+          `Reminder: Please clear the remaining balance of PKR ${remainingAmount.toLocaleString()} for your booking of ${packageName} on ${booking.date}.`,
+          'BOOKING_UPDATE',
+          { bookingId: booking._id }
+        );
+      }
 
       // Send to Vendor
-      await createNotification(
-        booking.vendor._id,
-        'Collect Remaining Payment',
-        `Reminder: Please collect the remaining balance of PKR ${remainingAmount.toLocaleString()} from ${clientName} for their booking of ${packageName} on ${booking.date}.`,
-        'BOOKING_UPDATE',
-        { bookingId: booking._id }
-      );
+      if (booking.vendor && booking.vendor._id) {
+        await createNotification(
+          booking.vendor._id,
+          'Collect Remaining Payment',
+          `Reminder: Please collect the remaining balance of PKR ${remainingAmount.toLocaleString()} from ${clientName} for their booking of ${packageName} on ${booking.date}.`,
+          'BOOKING_UPDATE',
+          { bookingId: booking._id }
+        );
+      }
 
       booking.paymentReminderSent = true;
       await booking.save();
