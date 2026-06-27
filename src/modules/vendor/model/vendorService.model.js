@@ -91,6 +91,14 @@ const vendorServiceSchema = new mongoose.Schema(
       longitude: {
         type: Number,
       },
+      isOnSite: {
+        type: Boolean,
+        default: false,
+      },
+      onSiteFee: {
+        type: Number,
+        default: 0,
+      },
     },
     capacity: {
       minGuests: {

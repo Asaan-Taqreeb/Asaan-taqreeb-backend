@@ -124,6 +124,8 @@ const updateService = async (serviceId, vendorId, data) => {
     if (basicInfo.about !== undefined) service.basicInfo.about = basicInfo.about;
     if (basicInfo.latitude !== undefined) service.basicInfo.latitude = basicInfo.latitude;
     if (basicInfo.longitude !== undefined) service.basicInfo.longitude = basicInfo.longitude;
+    if (basicInfo.isOnSite !== undefined) service.basicInfo.isOnSite = basicInfo.isOnSite;
+    if (basicInfo.onSiteFee !== undefined) service.basicInfo.onSiteFee = basicInfo.onSiteFee;
   }
 
   if (capacity) {
