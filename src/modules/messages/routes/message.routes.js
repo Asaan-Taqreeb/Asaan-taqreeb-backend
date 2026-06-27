@@ -11,6 +11,7 @@ const sendMessageValidation = [
   body('receiverId').trim().notEmpty().withMessage('receiverId is required'),
   body('text').optional().trim(),
   body('imageUrl').optional().trim(),
+  body('audioUrl').optional().trim(),
 ];
 
 // Protected: get all user chats (inbox)

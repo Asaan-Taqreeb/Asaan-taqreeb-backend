@@ -115,9 +115,9 @@ const deleteChat = async (chatId, userId) => {
   return result;
 };
 
-const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageUrl }) => {
-  if (!chatId || !receiverId || (!text && !imageUrl)) {
-    const error = new Error('chatId, receiverId, and either text or imageUrl are required');
+const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageUrl, audioUrl }) => {
+  if (!chatId || !receiverId || (!text && !imageUrl && !audioUrl)) {
+    const error = new Error('chatId, receiverId, and either text, imageUrl, or audioUrl are required');
     error.statusCode = 422;
     throw error;
   }
@@ -129,6 +129,7 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageU
     bookingId: bookingId || null,
     text: text || '',
     imageUrl: imageUrl || '',
+    audioUrl: audioUrl || '',
     isRead: false,
   });
 
@@ -154,7 +155,7 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageU
     `New Message from ${populatedMessage.senderId.name}`,
     text
       ? (text.length > 30 ? text.substring(0, 30) + '...' : text)
-      : (imageUrl ? 'Sent a payment proof image' : 'New message'),
+      : (imageUrl ? 'Sent a payment proof image' : (audioUrl ? 'Sent a voice message' : 'New message')),
     'NEW_MESSAGE',
     { chatId, bookingId, messageId: message._id }
   );

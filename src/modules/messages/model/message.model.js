@@ -30,6 +30,10 @@ const messageSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    audioUrl: {
+      type: String,
+      trim: true,
+    },
     isRead: {
       type: Boolean,
       default: false,

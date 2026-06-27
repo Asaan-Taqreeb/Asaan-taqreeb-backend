@@ -21,11 +21,15 @@ if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !pr
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  // Accept images only
-  if (file.mimetype.startsWith('image/')) {
+  // Accept images and audio files
+  if (
+    file.mimetype.startsWith('image/') ||
+    file.mimetype.startsWith('audio/') ||
+    (file.originalname && file.originalname.match(/\.(m4a|caf|mp3|wav|ogg|aac|3gp)$/i))
+  ) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed'), false);
+    cb(new Error('Only image and audio files are allowed'), false);
   }
 };
 

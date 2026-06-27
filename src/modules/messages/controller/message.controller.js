@@ -37,13 +37,21 @@ const sendMessage = async (req, res, next) => {
     }
 
     let imageUrl = req.body.imageUrl || '';
+    let audioUrl = req.body.audioUrl || '';
     if (req.file) {
-      imageUrl = await uploadToCloudinary(req.file, 'messages');
+      const isAudio = req.file.mimetype.startsWith('audio/') || (req.file.originalname && req.file.originalname.match(/\.(m4a|caf|mp3|wav|ogg|aac|3gp)$/i));
+      const url = await uploadToCloudinary(req.file, 'messages');
+      if (isAudio) {
+        audioUrl = url;
+      } else {
+        imageUrl = url;
+      }
     }
 
     const message = await messageService.sendMessage(req.user.id, {
       ...req.body,
       imageUrl,
+      audioUrl,
     });
     res.status(201).json({ success: true, data: message });
   } catch (error) {
