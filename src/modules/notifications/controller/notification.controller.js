@@ -42,9 +42,10 @@ const updatePushToken = async (req, res, next) => {
     const { expoPushToken, fcmToken, webPushSubscription } = req.body;
     const updateData = {};
 
-    if (expoPushToken) updateData.expoPushToken = expoPushToken;
-    if (fcmToken) updateData.fcmToken = fcmToken;
-    if (webPushSubscription) updateData.webPushSubscription = webPushSubscription;
+    // Accept explicit null to CLEAR a token, as well as a string to SET it.
+    if (expoPushToken !== undefined) updateData.expoPushToken = expoPushToken ?? null;
+    if (fcmToken !== undefined) updateData.fcmToken = fcmToken ?? null;
+    if (webPushSubscription !== undefined) updateData.webPushSubscription = webPushSubscription ?? null;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ success: false, message: 'No tokens provided' });

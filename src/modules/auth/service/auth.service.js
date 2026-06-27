@@ -291,7 +291,14 @@ const refresh = async (token, role) => {
 };
 
 const logout = async (userId) => {
-  await User.findByIdAndUpdate(userId, { refreshToken: null });
+  // Clear push tokens along with the refresh token so the logged-out
+  // device no longer receives push notifications for this account.
+  await User.findByIdAndUpdate(userId, {
+    refreshToken: null,
+    expoPushToken: null,
+    fcmToken: null,
+    webPushSubscription: null,
+  });
 };
 
 const getMe = async (userId, activeRole) => {
