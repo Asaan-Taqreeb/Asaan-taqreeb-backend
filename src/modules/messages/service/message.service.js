@@ -3,6 +3,15 @@ const { getIo } = require('../../../config/socket');
 const { createNotification } = require('../../notifications/service/notification.service');
 const { Types } = require('mongoose');
 
+const getChatRoomId = (chatId) => {
+  const roomId = String(chatId || '').trim();
+  if (!roomId) {
+    return '';
+  }
+
+  return roomId.startsWith('chat_') ? roomId : `chat_${roomId}`;
+};
+
 const getChatHistory = async (chatId, userId) => {
   // Verify that the user is part of this conversation
   const messages = await Message.find({ chatId })
@@ -141,8 +150,14 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageU
   // Emit real-time message via socket
   try {
     const io = getIo();
+    const roomId = getChatRoomId(chatId);
+
+    if (!roomId) {
+      throw new Error('Invalid chat room');
+    }
+
     // Emit to the specific chat room
-    io.to(`chat_${chatId}`).emit('receiveMessage', populatedMessage);
+    io.to(roomId).emit('receiveMessage', populatedMessage);
     // Also emit to the receiver's personal room for global notification if they aren't in the chat screen
     io.to(receiverId.toString()).emit('newMessageNotification', populatedMessage);
   } catch (e) {

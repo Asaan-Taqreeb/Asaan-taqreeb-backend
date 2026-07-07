@@ -4,6 +4,15 @@ const User = require('../modules/auth/model/user.model');
 
 let io;
 
+const getChatRoomId = (bookingId) => {
+  const chatId = String(bookingId || '').trim();
+  if (!chatId) {
+    return '';
+  }
+
+  return chatId.startsWith('chat_') ? chatId : `chat_${chatId}`;
+};
+
 const initSocket = (server) => {
   io = socketIo(server, {
     cors: {
@@ -42,18 +51,33 @@ const initSocket = (server) => {
 
     // Join a chat room
     socket.on('joinChat', (bookingId) => {
-      socket.join(`chat_${bookingId}`);
-      console.log(`User ${socket.user._id} joined chat_${bookingId}`);
+      const roomId = getChatRoomId(bookingId);
+      if (!roomId) {
+        return;
+      }
+
+      socket.join(roomId);
+      console.log(`User ${socket.user._id} joined ${roomId}`);
     });
 
     socket.on('leaveChat', (bookingId) => {
-      socket.leave(`chat_${bookingId}`);
-      console.log(`User ${socket.user._id} left chat_${bookingId}`);
+      const roomId = getChatRoomId(bookingId);
+      if (!roomId) {
+        return;
+      }
+
+      socket.leave(roomId);
+      console.log(`User ${socket.user._id} left ${roomId}`);
     });
 
     // Handle typing indicators
     socket.on('typing', ({ bookingId, isTyping }) => {
-      socket.to(`chat_${bookingId}`).emit('typing', {
+      const roomId = getChatRoomId(bookingId);
+      if (!roomId) {
+        return;
+      }
+
+      socket.to(roomId).emit('typing', {
         userId: socket.user._id,
         isTyping
       });
