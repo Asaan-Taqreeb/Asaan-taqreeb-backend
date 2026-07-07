@@ -1,6 +1,6 @@
 {
-  "latestVersion": "1.2.0",
-  "apkUrl": "",
-  "forceUpdate": false,
-  "releaseNotes": ""
+  "latestVersion": "1.2.1",
+  "apkUrl": "https://github.com/Asaan-Taqreeb/Asaan-Taqreeb-App/actions/runs/28323539571/artifacts/7935184968",
+  "forceUpdate": true,
+  "releaseNotes": "Notification Bug Fix"
 }
