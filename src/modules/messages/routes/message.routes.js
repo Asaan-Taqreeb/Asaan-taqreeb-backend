@@ -17,6 +17,9 @@ const sendMessageValidation = [
 // Protected: get all user chats (inbox)
 router.get('/', protect, messageController.getUserChats);
 
+// Protected: get unread message count
+router.get('/count/unread', protect, messageController.getUnreadCount);
+
 // Protected: get chat history
 router.get('/:chatId', protect, messageController.getChatHistory);
 
@@ -28,8 +31,5 @@ router.post('/', protect, upload.single('image'), sendMessageValidation, message
 
 // Protected: mark chat as read
 router.patch('/:chatId/read', protect, messageController.markAsRead);
-
-// Protected: get unread message count
-router.get('/count/unread', protect, messageController.getUnreadCount);
 
 module.exports = router;

@@ -4,13 +4,29 @@ const User = require('../modules/auth/model/user.model');
 
 let io;
 
-const getChatRoomId = (bookingId) => {
+const getChatRoomIds = (bookingId) => {
   const chatId = String(bookingId || '').trim();
+
   if (!chatId) {
-    return '';
+    return [];
   }
 
-  return chatId.startsWith('chat_') ? chatId : `chat_${chatId}`;
+  const roomIds = new Set([chatId]);
+
+  if (chatId.startsWith('chat_')) {
+    const segments = chatId.split('_');
+    if (segments.length === 3) {
+      const [, firstUserId, secondUserId] = segments;
+      const canonicalRoomId = firstUserId.localeCompare(secondUserId) <= 0
+        ? `chat_${firstUserId}_${secondUserId}`
+        : `chat_${secondUserId}_${firstUserId}`;
+      roomIds.add(canonicalRoomId);
+    }
+  } else {
+    roomIds.add(`chat_${chatId}`);
+  }
+
+  return [...roomIds].filter(Boolean);
 };
 
 const initSocket = (server) => {
@@ -51,36 +67,36 @@ const initSocket = (server) => {
 
     // Join a chat room
     socket.on('joinChat', (bookingId) => {
-      const roomId = getChatRoomId(bookingId);
-      if (!roomId) {
+      const roomIds = getChatRoomIds(bookingId);
+      if (roomIds.length === 0) {
         return;
       }
 
-      socket.join(roomId);
-      console.log(`User ${socket.user._id} joined ${roomId}`);
+      roomIds.forEach((roomId) => socket.join(roomId));
+      console.log(`User ${socket.user._id} joined ${roomIds.join(', ')}`);
     });
 
     socket.on('leaveChat', (bookingId) => {
-      const roomId = getChatRoomId(bookingId);
-      if (!roomId) {
+      const roomIds = getChatRoomIds(bookingId);
+      if (roomIds.length === 0) {
         return;
       }
 
-      socket.leave(roomId);
-      console.log(`User ${socket.user._id} left ${roomId}`);
+      roomIds.forEach((roomId) => socket.leave(roomId));
+      console.log(`User ${socket.user._id} left ${roomIds.join(', ')}`);
     });
 
     // Handle typing indicators
     socket.on('typing', ({ bookingId, isTyping }) => {
-      const roomId = getChatRoomId(bookingId);
-      if (!roomId) {
+      const roomIds = getChatRoomIds(bookingId);
+      if (roomIds.length === 0) {
         return;
       }
 
-      socket.to(roomId).emit('typing', {
+      roomIds.forEach((roomId) => socket.to(roomId).emit('typing', {
         userId: socket.user._id,
         isTyping
-      });
+      }));
     });
 
     socket.on('disconnect', () => {

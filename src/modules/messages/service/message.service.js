@@ -3,18 +3,46 @@ const { getIo } = require('../../../config/socket');
 const { createNotification } = require('../../notifications/service/notification.service');
 const { Types } = require('mongoose');
 
-const getChatRoomId = (chatId) => {
+const getChatIdVariants = (chatId) => {
   const roomId = String(chatId || '').trim();
+
   if (!roomId) {
+    return [];
+  }
+
+  const variants = new Set([roomId]);
+
+  if (roomId.startsWith('chat_')) {
+    const segments = roomId.split('_');
+
+    if (segments.length === 3) {
+      const [, firstUserId, secondUserId] = segments;
+      const canonicalChatId = getCanonicalChatId(firstUserId, secondUserId);
+      variants.add(canonicalChatId);
+    }
+  } else {
+    variants.add(`chat_${roomId}`);
+  }
+
+  return [...variants].filter(Boolean);
+};
+
+const getCanonicalChatId = (firstUserId, secondUserId) => {
+  const first = String(firstUserId || '').trim();
+  const second = String(secondUserId || '').trim();
+
+  if (!first || !second) {
     return '';
   }
 
-  return roomId.startsWith('chat_') ? roomId : `chat_${roomId}`;
+  return first.localeCompare(second) <= 0 ? `chat_${first}_${second}` : `chat_${second}_${first}`;
 };
 
 const getChatHistory = async (chatId, userId) => {
+  const chatIdVariants = getChatIdVariants(chatId);
+
   // Verify that the user is part of this conversation
-  const messages = await Message.find({ chatId })
+  const messages = await Message.find({ chatId: { $in: chatIdVariants } })
     .populate('senderId', 'name email')
     .populate('receiverId', 'name email')
     .sort({ createdAt: 1 })
@@ -34,13 +62,13 @@ const getChatHistory = async (chatId, userId) => {
 
   // Mark messages as read if the current user is the receiver
   await Message.updateMany(
-    { chatId, receiverId: userId, isRead: false },
+    { chatId: { $in: chatIdVariants }, receiverId: userId, isRead: false },
     { isRead: true }
   );
 
   // Also mark notifications as read
   const { markChatNotificationsAsRead } = require('../../notifications/service/notification.service');
-  await markChatNotificationsAsRead(userId, chatId);
+  await markChatNotificationsAsRead(userId, chatIdVariants[0] || chatId);
 
   return messages;
 };
@@ -85,36 +113,74 @@ const getUserChats = async (userId) => {
     { path: 'lastMessage.receiverId', model: 'User', select: 'name email profileImage' }
   ]);
 
-  return populatedChats.map(chat => {
+  const mergedChats = new Map();
+
+  const getParticipantChatId = (lastMessage) => {
+    if (!lastMessage?.senderId?._id || !lastMessage?.receiverId?._id) {
+      return '';
+    }
+
+    return getCanonicalChatId(lastMessage.senderId._id.toString(), lastMessage.receiverId._id.toString());
+  };
+
+  populatedChats.forEach(chat => {
     const senderId = chat.lastMessage.senderId;
     const receiverId = chat.lastMessage.receiverId;
+    const canonicalChatId = getParticipantChatId(chat.lastMessage) || chat._id;
+    const existing = mergedChats.get(canonicalChatId);
 
     if (!senderId || !receiverId) {
-      return {
+      const fallbackChat = {
         chatId: chat._id,
         lastMessage: chat.lastMessage,
         unreadCount: chat.unreadCount,
         otherUser: { name: 'Unknown User', _id: 'deleted' }
       };
+
+      if (!existing) {
+        mergedChats.set(chat._id, fallbackChat);
+      }
+      return;
     }
 
     const isSender = senderId._id.toString() === userId.toString();
     const otherUser = isSender ? receiverId : senderId;
 
-    return {
-      chatId: chat._id,
+    const nextChat = {
+      chatId: canonicalChatId,
       lastMessage: chat.lastMessage,
       unreadCount: chat.unreadCount,
       otherUser
     };
+
+    if (!existing) {
+      mergedChats.set(canonicalChatId, nextChat);
+      return;
+    }
+
+    const existingCreatedAt = new Date(existing.lastMessage.createdAt).getTime();
+    const nextCreatedAt = new Date(nextChat.lastMessage.createdAt).getTime();
+
+    mergedChats.set(canonicalChatId, {
+      ...existing,
+      lastMessage: nextCreatedAt >= existingCreatedAt ? nextChat.lastMessage : existing.lastMessage,
+      unreadCount: existing.unreadCount + nextChat.unreadCount,
+      otherUser: existing.otherUser
+    });
   });
+
+  return [...mergedChats.values()].sort(
+    (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
+  );
 };
 
 const deleteChat = async (chatId, userId) => {
+  const chatIdVariants = getChatIdVariants(chatId);
+
   // We delete messages where the user is either sender or receiver
   // This ensures a user can only delete chats they belong to
   const result = await Message.deleteMany({
-    chatId,
+    chatId: { $in: chatIdVariants },
     $or: [
       { senderId: userId },
       { receiverId: userId }
@@ -131,8 +197,12 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageU
     throw error;
   }
 
+  const canonicalChatId = getCanonicalChatId(userId, receiverId) || String(chatId).trim();
+  const chatIdVariants = getChatIdVariants(chatId);
+  const emitChatIds = [...new Set([canonicalChatId, ...chatIdVariants].filter(Boolean))];
+
   const message = await Message.create({
-    chatId,
+    chatId: canonicalChatId,
     senderId: userId,
     receiverId,
     bookingId: bookingId || null,
@@ -150,14 +220,14 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageU
   // Emit real-time message via socket
   try {
     const io = getIo();
-    const roomId = getChatRoomId(chatId);
-
-    if (!roomId) {
+    if (emitChatIds.length === 0) {
       throw new Error('Invalid chat room');
     }
 
     // Emit to the specific chat room
-    io.to(roomId).emit('receiveMessage', populatedMessage);
+    emitChatIds.forEach((roomId) => {
+      io.to(roomId).emit('receiveMessage', populatedMessage);
+    });
     // Also emit to the receiver's personal room for global notification if they aren't in the chat screen
     io.to(receiverId.toString()).emit('newMessageNotification', populatedMessage);
   } catch (e) {
@@ -179,14 +249,16 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageU
 };
 
 const markAsRead = async (chatId, userId) => {
+  const chatIdVariants = getChatIdVariants(chatId);
+
   const result = await Message.updateMany(
-    { chatId, receiverId: userId, isRead: false },
+    { chatId: { $in: chatIdVariants }, receiverId: userId, isRead: false },
     { isRead: true }
   );
 
   // Also mark notifications as read
   const { markChatNotificationsAsRead } = require('../../notifications/service/notification.service');
-  await markChatNotificationsAsRead(userId, chatId);
+  await markChatNotificationsAsRead(userId, chatIdVariants[0] || chatId);
 
   return result;
 };
