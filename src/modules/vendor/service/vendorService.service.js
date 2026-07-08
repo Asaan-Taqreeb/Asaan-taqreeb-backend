@@ -127,6 +127,12 @@ const updateService = async (serviceId, vendorId, data) => {
     if (basicInfo.longitude !== undefined) service.basicInfo.longitude = basicInfo.longitude;
     if (basicInfo.isOnSite !== undefined) service.basicInfo.isOnSite = basicInfo.isOnSite;
     if (basicInfo.onSiteFee !== undefined) service.basicInfo.onSiteFee = basicInfo.onSiteFee;
+    if (basicInfo.operatingHours) {
+      service.basicInfo.operatingHours = {
+        from: basicInfo.operatingHours.from || '09:00 AM',
+        to: basicInfo.operatingHours.to || '09:00 PM',
+      };
+    }
   }
 
   if (capacity) {
@@ -352,9 +358,14 @@ const unblockAvailability = async (vendorId, date, timeSlot, branchId) => {
   const query = {
     vendor: vendorId,
     date,
-    'timeSlot.from': timeSlot.from,
-    'timeSlot.to': timeSlot.to,
   };
+
+  if (timeSlot && timeSlot.from && timeSlot.to) {
+    query['timeSlot.from'] = timeSlot.from;
+    query['timeSlot.to'] = timeSlot.to;
+  } else {
+    query.type = 'BLOCKED';
+  }
 
   if (branchId) {
     query.branchId = branchId;
@@ -362,7 +373,7 @@ const unblockAvailability = async (vendorId, date, timeSlot, branchId) => {
     query.$or = [{ branchId: null }, { branchId: { $exists: false } }, { branchId: '' }];
   }
 
-  const result = await VendorAvailability.deleteOne(query);
+  const result = await VendorAvailability.deleteMany(query);
 
   if (result.deletedCount === 0) {
     const error = new Error('Availability record not found');

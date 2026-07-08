@@ -129,6 +129,10 @@ const vendorServiceSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      operatingHours: {
+        from: { type: String, default: '09:00 AM' },
+        to: { type: String, default: '09:00 PM' },
+      },
     },
     capacity: {
       minGuests: {
