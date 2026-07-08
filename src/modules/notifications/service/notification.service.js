@@ -77,11 +77,14 @@ const createNotification = async (userId, title, body, type = 'SYSTEM', data = {
 
     // Handle grouping for NEW_MESSAGE type
     if (type === 'NEW_MESSAGE' && data.chatId) {
+      const { getChatIdVariants } = require('../../messages/service/message.service');
+      const chatIdVariants = getChatIdVariants(data.chatId);
+
       const existingNotification = await Notification.findOne({
         user: userId,
         type: 'NEW_MESSAGE',
         isRead: false,
-        'data.chatId': data.chatId,
+        'data.chatId': { $in: chatIdVariants },
       });
 
       if (existingNotification) {
@@ -206,8 +209,9 @@ const markAllAsRead = async (userId) => {
 };
 
 const markChatNotificationsAsRead = async (userId, chatId) => {
+  const chatIds = Array.isArray(chatId) ? chatId : [chatId];
   await Notification.updateMany(
-    { user: userId, type: 'NEW_MESSAGE', 'data.chatId': chatId, isRead: false },
+    { user: userId, type: 'NEW_MESSAGE', 'data.chatId': { $in: chatIds }, isRead: false },
     { isRead: true }
   );
   return { success: true };

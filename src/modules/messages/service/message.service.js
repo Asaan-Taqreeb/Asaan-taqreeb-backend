@@ -19,6 +19,8 @@ const getChatIdVariants = (chatId) => {
       const [, firstUserId, secondUserId] = segments;
       const canonicalChatId = getCanonicalChatId(firstUserId, secondUserId);
       variants.add(canonicalChatId);
+      // Also add the reversed version to ensure all combinations of user IDs are covered
+      variants.add(`chat_${secondUserId}_${firstUserId}`);
     }
   } else {
     variants.add(`chat_${roomId}`);
@@ -68,7 +70,7 @@ const getChatHistory = async (chatId, userId) => {
 
   // Also mark notifications as read
   const { markChatNotificationsAsRead } = require('../../notifications/service/notification.service');
-  await markChatNotificationsAsRead(userId, chatIdVariants[0] || chatId);
+  await markChatNotificationsAsRead(userId, chatIdVariants);
 
   return messages;
 };
@@ -242,7 +244,7 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageU
       ? (text.length > 30 ? text.substring(0, 30) + '...' : text)
       : (imageUrl ? 'Sent a payment proof image' : (audioUrl ? 'Sent a voice message' : 'New message')),
     'NEW_MESSAGE',
-    { chatId, bookingId, messageId: message._id }
+    { chatId: canonicalChatId, bookingId, messageId: message._id }
   );
 
   return populatedMessage;
@@ -258,7 +260,7 @@ const markAsRead = async (chatId, userId) => {
 
   // Also mark notifications as read
   const { markChatNotificationsAsRead } = require('../../notifications/service/notification.service');
-  await markChatNotificationsAsRead(userId, chatIdVariants[0] || chatId);
+  await markChatNotificationsAsRead(userId, chatIdVariants);
 
   return result;
 };
