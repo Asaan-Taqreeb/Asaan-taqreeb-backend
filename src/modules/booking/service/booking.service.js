@@ -55,9 +55,29 @@ const checkTimeSlotConflict = async (vendorId, date, timeSlot, branchId) => {
     query.$or.push({ branchId: null }, { branchId: { $exists: false } }, { branchId: '' });
   }
 
-  const conflict = await VendorAvailability.findOne(query);
+  const conflictingAvailabilities = await VendorAvailability.find(query);
 
-  if (conflict) {
+  for (const conflict of conflictingAvailabilities) {
+    // For PENDING_BOOKING type, verify there's an actual pending booking in the DB
+    // If no corresponding booking exists, this is an orphaned record - clean it up
+    if (conflict.type === 'PENDING_BOOKING') {
+      const matchingBooking = await Booking.findOne({
+        vendor: vendorId,
+        date,
+        'timeSlot.from': conflict.timeSlot.from,
+        'timeSlot.to': conflict.timeSlot.to,
+        status: { $in: ['PENDING', 'APPROVED', 'CONFIRMED'] },
+      });
+
+      if (!matchingBooking) {
+        // Orphaned record - auto-cleanup
+        console.log(`[booking] Auto-cleaning orphaned PENDING_BOOKING for vendor ${vendorId} on ${date} ${conflict.timeSlot.from}-${conflict.timeSlot.to}`);
+        await VendorAvailability.deleteOne({ _id: conflict._id });
+        continue; // Skip this record - it's orphaned
+      }
+    }
+
+    // For BLOCKED or BOOKED types, or valid PENDING_BOOKING, throw conflict error
     const error = new Error(
       `Time slot conflict on ${date} from ${timeSlot.from} to ${timeSlot.to}`
     );
@@ -290,11 +310,12 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
 
   // If approved/confirmed, convert PENDING_BOOKING to BOOKED
   if (status === 'APPROVED' || status === 'CONFIRMED') {
-    // Update the pending booking entry to BOOKED
+    // Update the pending booking entry to BOOKED using dot notation for reliable matching
     const query = {
       vendor: booking.vendor,
       date: booking.date,
-      timeSlot: booking.timeSlot,
+      'timeSlot.from': booking.timeSlot.from,
+      'timeSlot.to': booking.timeSlot.to,
       type: 'PENDING_BOOKING',
     };
     if (booking.branchId) {
@@ -311,19 +332,19 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
 
   // If rejected or cancelled, remove the availability block entirely
   if (status === 'REJECTED' || status === 'CANCELLED') {
+    // Use dot notation for reliable embedded document matching
+    // Use deleteMany to clean up any duplicate orphaned records
     const query = {
       vendor: booking.vendor,
       date: booking.date,
-      timeSlot: booking.timeSlot,
-      $or: [
-        { type: 'PENDING_BOOKING' },
-        { type: 'BOOKED' }
-      ],
+      'timeSlot.from': booking.timeSlot.from,
+      'timeSlot.to': booking.timeSlot.to,
+      type: { $in: ['PENDING_BOOKING', 'BOOKED'] },
     };
     if (booking.branchId) {
       query.branchId = booking.branchId;
     }
-    await VendorAvailability.deleteOne(query);
+    await VendorAvailability.deleteMany(query);
 
     if (status === 'REJECTED' && rejectionReason) {
       booking.rejectionReason = rejectionReason;
@@ -388,20 +409,18 @@ const cancelBooking = async (bookingId, clientId) => {
 
   booking.status = 'CANCELLED';
 
-  // Remove the availability block
+  // Remove the availability block using dot notation for reliable matching
   const query = {
     vendor: booking.vendor,
     date: booking.date,
-    timeSlot: booking.timeSlot,
-    $or: [
-      { type: 'PENDING_BOOKING' },
-      { type: 'BOOKED' }
-    ],
+    'timeSlot.from': booking.timeSlot.from,
+    'timeSlot.to': booking.timeSlot.to,
+    type: { $in: ['PENDING_BOOKING', 'BOOKED'] },
   };
   if (booking.branchId) {
     query.branchId = booking.branchId;
   }
-  await VendorAvailability.deleteOne(query);
+  await VendorAvailability.deleteMany(query);
 
   await booking.save();
   await booking.populate('vendor', 'name email');
