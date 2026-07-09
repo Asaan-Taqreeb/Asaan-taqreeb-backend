@@ -64,6 +64,7 @@ const updateServiceValidation = [
   body('capacity.minGuests').optional().isInt({ min: 1 }).withMessage('minGuests must be >= 1'),
   body('capacity.maxGuests').optional().isInt({ min: 1 }).withMessage('maxGuests must be >= 1'),
   body('images').optional().isArray().withMessage('Images must be an array'),
+  body('packages').optional().isArray().withMessage('Packages must be an array'),
 ];
 
 // Services

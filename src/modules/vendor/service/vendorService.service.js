@@ -116,7 +116,7 @@ const updateService = async (serviceId, vendorId, data) => {
     throw error;
   }
 
-  const { basicInfo, capacity, images, optionalServices, branches } = data;
+  const { basicInfo, capacity, images, optionalServices, branches, packages } = data;
 
   if (basicInfo) {
     if (basicInfo.name) service.basicInfo.name = basicInfo.name;
@@ -150,6 +150,10 @@ const updateService = async (serviceId, vendorId, data) => {
 
   if (branches !== undefined && Array.isArray(branches)) {
     service.branches = branches;
+  }
+
+  if (packages !== undefined && Array.isArray(packages)) {
+    service.packages = packages;
   }
 
   await service.save();
