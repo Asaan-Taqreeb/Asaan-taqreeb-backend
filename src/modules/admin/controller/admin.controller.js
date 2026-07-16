@@ -7,9 +7,15 @@ const getUsers = async (req, res, next) => {
     const { role, verificationStatus, isActive, search, limit = 10, page = 1 } = req.query;
 
     const query = { deletedAt: { $exists: false } };
+    const andConditions = [];
 
     if (role) {
-      query.role = role;
+      andConditions.push({
+        $or: [
+          { role: role },
+          { roles: role }
+        ]
+      });
     }
     if (verificationStatus) {
       query.verificationStatus = verificationStatus;
@@ -18,11 +24,17 @@ const getUsers = async (req, res, next) => {
       query.isActive = isActive === 'true';
     }
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
-      ];
+      andConditions.push({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search, $options: 'i' } }
+        ]
+      });
+    }
+
+    if (andConditions.length > 0) {
+      query.$and = andConditions;
     }
 
     const parsedLimit = parseInt(limit, 10);
