@@ -199,7 +199,11 @@ const deleteImage = async (req, res, next) => {
     }
 
     // Call Cloudinary deletion logic
-    await deleteFromCloudinary(imageUrl);
+    try {
+      await deleteFromCloudinary(imageUrl);
+    } catch (cloudinaryError) {
+      console.warn('Cloudinary deletion failed, proceeding with DB deletion:', cloudinaryError.message);
+    }
     
     // Remove from database
     const result = await vendorServiceService.removeServiceImage(
