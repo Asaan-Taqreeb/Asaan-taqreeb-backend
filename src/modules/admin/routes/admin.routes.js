@@ -14,4 +14,8 @@ router.patch('/users/:id/status', adminController.updateUserStatus);
 router.patch('/users/:id/verify', adminController.verifyUserKYC);
 router.delete('/users/:id', adminController.deleteUser);
 
+// Services management
+router.get('/services', adminController.getServices);
+router.delete('/services/:id', adminController.deleteService);
+
 module.exports = router;
