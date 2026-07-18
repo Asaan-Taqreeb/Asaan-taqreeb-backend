@@ -3,42 +3,7 @@ const { getIo } = require('../../../config/socket');
 const { createNotification } = require('../../notifications/service/notification.service');
 const { Types } = require('mongoose');
 
-const getChatIdVariants = (chatId) => {
-  const roomId = String(chatId || '').trim();
-
-  if (!roomId) {
-    return [];
-  }
-
-  const variants = new Set([roomId]);
-
-  if (roomId.startsWith('chat_')) {
-    const segments = roomId.split('_');
-
-    if (segments.length === 3) {
-      const [, firstUserId, secondUserId] = segments;
-      const canonicalChatId = getCanonicalChatId(firstUserId, secondUserId);
-      variants.add(canonicalChatId);
-      // Also add the reversed version to ensure all combinations of user IDs are covered
-      variants.add(`chat_${secondUserId}_${firstUserId}`);
-    }
-  } else {
-    variants.add(`chat_${roomId}`);
-  }
-
-  return [...variants].filter(Boolean);
-};
-
-const getCanonicalChatId = (firstUserId, secondUserId) => {
-  const first = String(firstUserId || '').trim();
-  const second = String(secondUserId || '').trim();
-
-  if (!first || !second) {
-    return '';
-  }
-
-  return first.localeCompare(second) <= 0 ? `chat_${first}_${second}` : `chat_${second}_${first}`;
-};
+const { getCanonicalChatId, getChatIdVariants } = require('../utils/chat.util');
 
 const getChatHistory = async (chatId, userId) => {
   const chatIdVariants = getChatIdVariants(chatId);
@@ -236,16 +201,32 @@ const sendMessage = async (userId, { chatId, receiverId, bookingId, text, imageU
     console.log('Socket not ready');
   }
 
-  // Create notification
-  await createNotification(
-    receiverId,
-    `New Message from ${populatedMessage.senderId.name}`,
-    text
-      ? (text.length > 30 ? text.substring(0, 30) + '...' : text)
-      : (imageUrl ? 'Sent a payment proof image' : (audioUrl ? 'Sent a voice message' : 'New message')),
-    'NEW_MESSAGE',
-    { chatId: canonicalChatId, bookingId, messageId: message._id }
-  );
+  // Create notification safely without blocking message response
+  try {
+    const senderName = populatedMessage?.senderId?.name || 'User';
+    const senderIdStr = populatedMessage?.senderId?._id?.toString() || userId.toString();
+    const receiverIdStr = receiverId.toString();
+
+    await createNotification(
+      receiverId,
+      `New Message from ${senderName}`,
+      text
+        ? (text.length > 30 ? text.substring(0, 30) + '...' : text)
+        : (imageUrl ? 'Sent a payment proof image' : (audioUrl ? 'Sent a voice message' : 'New message')),
+      'NEW_MESSAGE',
+      {
+        chatId: canonicalChatId,
+        bookingId: bookingId || '',
+        messageId: message._id,
+        senderId: senderIdStr,
+        receiverId: receiverIdStr,
+        clientId: senderIdStr,
+        vendorId: receiverIdStr,
+      }
+    );
+  } catch (notificationError) {
+    console.error('Failed to create notification for message:', notificationError);
+  }
 
   return populatedMessage;
 };

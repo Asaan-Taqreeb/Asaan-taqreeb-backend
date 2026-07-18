@@ -77,7 +77,7 @@ const createNotification = async (userId, title, body, type = 'SYSTEM', data = {
 
     // Handle grouping for NEW_MESSAGE type
     if (type === 'NEW_MESSAGE' && data.chatId) {
-      const { getChatIdVariants } = require('../../messages/service/message.service');
+      const { getChatIdVariants } = require('../../messages/utils/chat.util');
       const chatIdVariants = getChatIdVariants(data.chatId);
 
       const existingNotification = await Notification.findOne({
@@ -127,13 +127,12 @@ const createNotification = async (userId, title, body, type = 'SYSTEM', data = {
         ? `${notification.data.unreadCount} new messages from ${title.replace('New Message from ', '')}`
         : body;
 
-      // Fire and forget (don't block the main flow)
-      const promises = [];
+      const pushData = { ...(notification?.data || data), type, userId: userId.toString() };
 
       // Send Expo Push Notification
       if (user.expoPushToken) {
         promises.push(
-          sendExpoPushNotification(user.expoPushToken, title, pushBody, data).catch(e => 
+          sendExpoPushNotification(user.expoPushToken, title, pushBody, pushData).catch(e => 
             console.error('Expo Push error:', e)
           )
         );
