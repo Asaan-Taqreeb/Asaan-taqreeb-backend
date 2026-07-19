@@ -123,6 +123,7 @@ const createNotification = async (userId, title, body, type = 'SYSTEM', data = {
 
     // Send Push Notifications (Expo + FCM) if tokens exist
     if (user) {
+      const promises = [];
       const pushBody = type === 'NEW_MESSAGE' && notification.data.unreadCount > 1
         ? `${notification.data.unreadCount} new messages from ${title.replace('New Message from ', '')}`
         : body;
