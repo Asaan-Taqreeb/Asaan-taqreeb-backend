@@ -388,15 +388,63 @@ const unblockAvailability = async (vendorId, date, timeSlot, branchId) => {
   return { message: 'Availability unblocked successfully' };
 };
 
+const normalizeTimeToHHMM = (timeStr) => {
+  if (!timeStr) return '00:00';
+  const str = String(timeStr).trim().toUpperCase();
+  const ampmMatch = str.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (ampmMatch) {
+    let hour = Number(ampmMatch[1]);
+    const minute = ampmMatch[2] || '00';
+    const period = ampmMatch[3];
+    if (hour === 12) hour = 0;
+    if (period === 'PM') hour += 12;
+    return `${String(hour).padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  }
+  const h24Match = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (h24Match) {
+    const hour = Number(h24Match[1]);
+    const minute = Number(h24Match[2]);
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  }
+  return str;
+};
+
+const toMinutes = (timeStr) => {
+  const normalized = normalizeTimeToHHMM(timeStr);
+  const parts = normalized.split(':');
+  if (parts.length >= 2) {
+    const h = Number(parts[0]);
+    const m = Number(parts[1]);
+    if (!isNaN(h) && !isNaN(m)) {
+      return h * 60 + m;
+    }
+  }
+  return null;
+};
+
+const timeRangesOverlap = (rangeA, rangeB) => {
+  const fromA = toMinutes(rangeA.from);
+  let toA = toMinutes(rangeA.to);
+  const fromB = toMinutes(rangeB.from);
+  let toB = toMinutes(rangeB.to);
+
+  if (fromA === null || toA === null || fromB === null || toB === null) return false;
+  if (toA <= fromA) toA += 24 * 60;
+  if (toB <= fromB) toB += 24 * 60;
+
+  return Math.max(fromA, fromB) < Math.min(toA, toB);
+};
+
 const isTimeSlotAvailable = async (vendorId, date, timeSlot, branchId) => {
+  const normalizedSlot = {
+    from: normalizeTimeToHHMM(timeSlot?.from),
+    to: normalizeTimeToHHMM(timeSlot?.to),
+  };
+
   const query = {
     vendor: vendorId,
     date,
-    $or: [
-      { 'timeSlot.from': { $lte: timeSlot.from }, 'timeSlot.to': { $gt: timeSlot.from } },
-      { 'timeSlot.from': { $lt: timeSlot.to }, 'timeSlot.to': { $gte: timeSlot.to } },
-      { 'timeSlot.from': { $gte: timeSlot.from }, 'timeSlot.to': { $lte: timeSlot.to } },
-    ],
+    type: 'BLOCKED',
   };
 
   if (branchId) {
@@ -405,9 +453,14 @@ const isTimeSlotAvailable = async (vendorId, date, timeSlot, branchId) => {
     query.$or = [{ branchId: null }, { branchId: { $exists: false } }, { branchId: '' }];
   }
 
-  const conflict = await VendorAvailability.findOne(query);
+  const blocks = await VendorAvailability.find(query);
+  for (const block of blocks) {
+    if (block.timeSlot && timeRangesOverlap(normalizedSlot, block.timeSlot)) {
+      return false;
+    }
+  }
 
-  return !conflict;
+  return true;
 };
 
 const addServiceImages = async (serviceId, vendorId, imageUrls) => {

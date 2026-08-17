@@ -38,74 +38,120 @@ const getBookingAdvanceAmount = (booking) => {
 };
 
 
-// Check for time slot conflicts
-const checkTimeSlotConflict = async (vendorId, date, timeSlot, branchId) => {
-  // Check for blocked availability or existing bookings
-  const query = {
+const normalizeTimeToHHMM = (timeStr) => {
+  if (!timeStr) return '00:00';
+  const str = String(timeStr).trim().toUpperCase();
+  const ampmMatch = str.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (ampmMatch) {
+    let hour = Number(ampmMatch[1]);
+    const minute = ampmMatch[2] || '00';
+    const period = ampmMatch[3];
+    if (hour === 12) hour = 0;
+    if (period === 'PM') hour += 12;
+    return `${String(hour).padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  }
+  const h24Match = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (h24Match) {
+    const hour = Number(h24Match[1]);
+    const minute = Number(h24Match[2]);
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  }
+  return str;
+};
+
+const toMinutes = (timeStr) => {
+  const normalized = normalizeTimeToHHMM(timeStr);
+  const parts = normalized.split(':');
+  if (parts.length >= 2) {
+    const h = Number(parts[0]);
+    const m = Number(parts[1]);
+    if (!isNaN(h) && !isNaN(m)) {
+      return h * 60 + m;
+    }
+  }
+  return null;
+};
+
+const timeRangesOverlap = (rangeA, rangeB) => {
+  const fromA = toMinutes(rangeA.from);
+  let toA = toMinutes(rangeA.to);
+  const fromB = toMinutes(rangeB.from);
+  let toB = toMinutes(rangeB.to);
+
+  if (fromA === null || toA === null || fromB === null || toB === null) return false;
+  if (toA <= fromA) toA += 24 * 60;
+  if (toB <= fromB) toB += 24 * 60;
+
+  return Math.max(fromA, fromB) < Math.min(toA, toB);
+};
+
+// Check for time slot conflicts with capacity support
+const checkTimeSlotConflict = async (vendorId, date, timeSlot, branchId, category, service) => {
+  const normalizedSlot = {
+    from: normalizeTimeToHHMM(timeSlot?.from),
+    to: normalizeTimeToHHMM(timeSlot?.to),
+  };
+
+  // 1. Check for manual vendor blocks (type: BLOCKED)
+  const blockQuery = {
     vendor: vendorId,
     date,
-    $or: [
-      { 'timeSlot.from': { $lt: timeSlot.to }, 'timeSlot.to': { $gt: timeSlot.from } },
-    ],
+    type: 'BLOCKED',
   };
   
   if (branchId) {
-    query.branchId = branchId;
+    blockQuery.branchId = branchId;
   } else {
-    query.$or.push({ branchId: null }, { branchId: { $exists: false } }, { branchId: '' });
+    blockQuery.$or = [{ branchId: null }, { branchId: { $exists: false } }, { branchId: '' }];
   }
 
-  const conflictingAvailabilities = await VendorAvailability.find(query);
-
-  for (const conflict of conflictingAvailabilities) {
-    // For PENDING_BOOKING type, verify there's an actual pending booking in the DB
-    // If no corresponding booking exists, this is an orphaned record - clean it up
-    if (conflict.type === 'PENDING_BOOKING') {
-      const matchingBooking = await Booking.findOne({
-        vendor: vendorId,
-        date,
-        'timeSlot.from': conflict.timeSlot.from,
-        'timeSlot.to': conflict.timeSlot.to,
-        status: { $in: ['PENDING', 'APPROVED', 'CONFIRMED'] },
-      });
-
-      if (!matchingBooking) {
-        // Orphaned record - auto-cleanup
-        console.log(`[booking] Auto-cleaning orphaned PENDING_BOOKING for vendor ${vendorId} on ${date} ${conflict.timeSlot.from}-${conflict.timeSlot.to}`);
-        await VendorAvailability.deleteOne({ _id: conflict._id });
-        continue; // Skip this record - it's orphaned
-      }
+  const manualBlocks = await VendorAvailability.find(blockQuery);
+  for (const block of manualBlocks) {
+    if (block.timeSlot && timeRangesOverlap(normalizedSlot, block.timeSlot)) {
+      const error = new Error(
+        `Time slot is blocked by vendor on ${date} (${block.timeSlot.from} to ${block.timeSlot.to})`
+      );
+      error.statusCode = 409;
+      throw error;
     }
-
-    // For BLOCKED or BOOKED types, or valid PENDING_BOOKING, throw conflict error
-    const error = new Error(
-      `Time slot conflict on ${date} from ${timeSlot.from} to ${timeSlot.to}`
-    );
-    error.statusCode = 409;
-    throw error;
   }
 
-  // Also check for existing confirmed bookings
+  // 2. Determine allowed concurrent capacity for this service
+  let allowedCapacity = 1;
+  if (category === 'PARLOR_SALON') {
+    allowedCapacity = (service && service.capacity && Number(service.capacity.maxGuests))
+      ? Number(service.capacity.maxGuests)
+      : 3; // Default 3 concurrent clients for salon
+  } else if (category === 'PHOTOGRAPHY') {
+    allowedCapacity = (service && service.capacity && Number(service.capacity.maxGuests))
+      ? Number(service.capacity.maxGuests)
+      : 1; // Default 1 team/slot for photography unless studio has more
+  }
+
+  // 3. Count active overlapping bookings
   const bookingQuery = {
     vendor: vendorId,
     date,
-    status: { $in: ['CONFIRMED', 'APPROVED'] },
-    $or: [
-      { 'timeSlot.from': { $lt: timeSlot.to }, 'timeSlot.to': { $gt: timeSlot.from } },
-    ],
+    status: { $in: ['PENDING', 'APPROVED', 'CONFIRMED'] },
   };
 
   if (branchId) {
     bookingQuery.branchId = branchId;
   } else {
-    bookingQuery.$or.push({ branchId: null }, { branchId: { $exists: false } }, { branchId: '' });
+    bookingQuery.$or = [{ branchId: null }, { branchId: { $exists: false } }, { branchId: '' }];
   }
 
-  const bookingConflict = await Booking.findOne(bookingQuery);
+  const existingBookings = await Booking.find(bookingQuery);
+  let overlappingCount = 0;
+  for (const booking of existingBookings) {
+    if (booking.timeSlot && timeRangesOverlap(normalizedSlot, booking.timeSlot)) {
+      overlappingCount++;
+    }
+  }
 
-  if (bookingConflict) {
+  if (overlappingCount >= allowedCapacity) {
     const error = new Error(
-      `This time slot is already booked on ${date}`
+      `This time slot has reached maximum capacity (${allowedCapacity} booking${allowedCapacity > 1 ? 's' : ''}) on ${date}`
     );
     error.statusCode = 409;
     throw error;
@@ -181,8 +227,13 @@ const createBooking = async (clientId, payload) => {
     }
   }
 
+  const normalizedTimeSlot = {
+    from: normalizeTimeToHHMM(timeSlot?.from),
+    to: normalizeTimeToHHMM(timeSlot?.to),
+  };
+
   // Check for time slot conflicts BEFORE creating booking
-  await checkTimeSlotConflict(service.user._id, date, timeSlot, branchId);
+  await checkTimeSlotConflict(service.user._id, date, normalizedTimeSlot, branchId, category, service);
 
   const addons = selectedAddons
     .map((name) => service.optionalServices.find((a) => a.name === name))
@@ -206,7 +257,7 @@ const createBooking = async (clientId, payload) => {
     },
     guestCount: requiresGuestCount ? normalizedGuestCount : normalizedGuestCount,
     date,
-    timeSlot,
+    timeSlot: normalizedTimeSlot,
     location,
     specialRequests,
     optionalAddons: addons,
