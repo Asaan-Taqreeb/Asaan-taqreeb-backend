@@ -683,6 +683,7 @@ async function seed() {
       const serviceData = {
         user: user._id,
         category: item.service.category,
+        approvalStatus: 'approved',
         basicInfo: item.service.basicInfo,
         capacity: item.service.capacity || { minGuests: 1, maxGuests: 500 },
         packages: item.service.packages || [],

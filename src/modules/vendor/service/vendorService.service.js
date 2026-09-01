@@ -45,8 +45,8 @@ const validateCategoryRules = (category, data) => {
 const createVendorService = async (userId, payload) => {
   const { category, basicInfo, capacity, packages, optionalServices, images, branches } = payload;
 
-  if (!CATEGORIES.includes(category)) {
-    const error = new Error(`Category must be one of: ${CATEGORIES.join(', ')}`);
+  if (!category || typeof category !== 'string' || !category.trim()) {
+    const error = new Error('A valid category name is required');
     error.statusCode = 422;
     throw error;
   }

@@ -94,7 +94,8 @@ const vendorServiceSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: ['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON'],
+      trim: true,
+      index: true,
     },
     approvalStatus: {
       type: String,
