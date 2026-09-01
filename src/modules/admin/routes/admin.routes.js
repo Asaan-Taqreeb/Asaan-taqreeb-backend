@@ -16,6 +16,9 @@ router.delete('/users/:id', adminController.deleteUser);
 
 // Services management
 router.get('/services', adminController.getServices);
+router.patch('/services/:id/review', adminController.reviewService);
+router.get('/category-requests', adminController.getCategoryRequests);
+router.patch('/category-requests/:id/review', adminController.reviewCategoryRequest);
 router.delete('/services/:id', adminController.deleteService);
 
 module.exports = router;

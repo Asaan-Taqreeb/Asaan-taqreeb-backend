@@ -11,13 +11,7 @@ const vendorAgreementSchema = new mongoose.Schema(
     },
     commissionRate: {
       type: Number,
-      default: 3, // 3% commission
-      required: true,
-    },
-    paymentFrequency: {
-      type: String,
-      enum: ['per_booking', 'monthly'],
-      default: 'per_booking',
+      default: 5,
       required: true,
     },
     agreementText: {

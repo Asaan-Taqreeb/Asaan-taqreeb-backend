@@ -2,6 +2,7 @@ const Booking = require('../model/booking.model');
 const VendorService = require('../../vendor/model/vendorService.model');
 const VendorAvailability = require('../../vendor/model/vendorAvailability.model');
 const { createNotification } = require('../../notifications/service/notification.service');
+const { addCommissionCharge } = require('../../vendor/service/commissionHistory.service');
 
 const calculatePricing = (category, pkg, guestCount, providedTotal, providedAdvance) => {
   if (providedTotal !== undefined && providedTotal !== null) {
@@ -381,6 +382,12 @@ const updateBookingStatus = async (bookingId, vendorId, status, rejectionReason 
     );
   }
 
+  // Charge the agreed 5% exactly once when a booking becomes confirmed.
+  if (status === 'CONFIRMED' && !booking.commissionCharged) {
+    await addCommissionCharge(booking.vendor, booking._id, getBookingTotalAmount(booking));
+    booking.commissionCharged = true;
+  }
+
   // If rejected or cancelled, remove the availability block entirely
   if (status === 'REJECTED' || status === 'CANCELLED') {
     // Use dot notation for reliable embedded document matching
@@ -608,4 +615,3 @@ module.exports = {
   recordRemainingPayment,
   sendPaymentReminders,
 };
-

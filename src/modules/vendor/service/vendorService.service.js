@@ -80,7 +80,8 @@ const createVendorService = async (userId, payload) => {
 };
 
 const getAllServices = async () => {
-  const services = await VendorService.find().populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } }).lean();
+  // Legacy listings predate moderation and remain visible; every new/edited listing is explicit pending.
+  const services = await VendorService.find({ $or: [{ approvalStatus: 'approved' }, { approvalStatus: { $exists: false } }] }).populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } }).lean();
   return services.filter((service) => service.user);
 };
 
@@ -155,6 +156,12 @@ const updateService = async (serviceId, vendorId, data) => {
   if (packages !== undefined && Array.isArray(packages)) {
     service.packages = packages;
   }
+
+  // Any vendor edit must be reviewed again before it is shown to clients.
+  service.approvalStatus = 'pending';
+  service.approvalNote = null;
+  service.approvedAt = null;
+  service.approvedBy = null;
 
   await service.save();
   return populateActiveUserDoc(service);
@@ -525,4 +532,3 @@ module.exports = {
   addServiceImages,
   removeServiceImage,
 };
-

@@ -39,7 +39,7 @@ const getAgreementText = async (req, res) => {
       success: true,
       data: {
         text: text,
-        commissionRate: 3,
+        commissionRate: 5,
       },
     });
   } catch (error) {
@@ -70,16 +70,7 @@ const acceptAgreement = async (req, res) => {
       });
     }
 
-    const { paymentFrequency } = req.body;
-
-    if (!paymentFrequency || !['per_booking', 'monthly'].includes(paymentFrequency)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid payment frequency. Must be "per_booking" or "monthly"',
-      });
-    }
-
-    const agreement = await vendorAgreementService.acceptAgreement(userId, paymentFrequency);
+    const agreement = await vendorAgreementService.acceptAgreement(userId);
 
     res.status(200).json({
       success: true,

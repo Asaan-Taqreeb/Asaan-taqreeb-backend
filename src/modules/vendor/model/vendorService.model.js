@@ -96,6 +96,19 @@ const vendorServiceSchema = new mongoose.Schema(
       required: true,
       enum: ['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON'],
     },
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+      index: true,
+    },
+    approvalNote: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    approvedAt: { type: Date, default: null },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     basicInfo: {
       name: {
         type: String,
@@ -166,8 +179,8 @@ const vendorServiceSchema = new mongoose.Schema(
 
 // Unique compound index: one active service per vendor per category
 vendorServiceSchema.index({ user: 1, category: 1 }, { unique: true });
+vendorServiceSchema.index({ approvalStatus: 1, createdAt: -1 });
 
 const VendorService = mongoose.model('VendorService', vendorServiceSchema);
 
 module.exports = VendorService;
-

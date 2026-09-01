@@ -106,6 +106,7 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    commissionCharged: { type: Boolean, default: false },
     paymentReminderSent: {
       type: Boolean,
       default: false,
@@ -126,4 +127,3 @@ const bookingSchema = new mongoose.Schema(
 const Booking = mongoose.model('Booking', bookingSchema);
 
 module.exports = Booking;
-

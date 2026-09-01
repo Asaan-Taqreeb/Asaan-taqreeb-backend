@@ -2,6 +2,7 @@ const User = require('../../auth/model/user.model');
 const identityService = require('../../auth/service/identity.service');
 const authService = require('../../auth/service/auth.service');
 const VendorService = require('../../vendor/model/vendorService.model');
+const CategoryRequest = require('../../app/model/categoryRequest.model');
 
 const getUsers = async (req, res, next) => {
   try {
@@ -186,6 +187,48 @@ const deleteService = async (req, res, next) => {
   }
 };
 
+const reviewService = async (req, res, next) => {
+  try {
+    const { status, note } = req.body;
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'status must be approved or rejected' });
+    }
+
+    const service = await VendorService.findByIdAndUpdate(
+      req.params.id,
+      {
+        approvalStatus: status,
+        approvalNote: note?.trim() || null,
+        approvedAt: status === 'approved' ? new Date() : null,
+        approvedBy: req.user.id,
+      },
+      { new: true }
+    );
+    if (!service) return res.status(404).json({ success: false, message: 'Service not found' });
+    res.status(200).json({ success: true, data: service });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getCategoryRequests = async (req, res, next) => {
+  try {
+    const query = req.query.status ? { status: req.query.status } : {};
+    const requests = await CategoryRequest.find(query).populate('vendor', 'name email').sort({ createdAt: -1 }).lean();
+    res.status(200).json({ success: true, data: requests });
+  } catch (error) { next(error); }
+};
+
+const reviewCategoryRequest = async (req, res, next) => {
+  try {
+    const { status, note } = req.body;
+    if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ success: false, message: 'status must be approved or rejected' });
+    const request = await CategoryRequest.findByIdAndUpdate(req.params.id, { status, adminNote: note?.trim() || null, reviewedBy: req.user.id, reviewedAt: new Date() }, { new: true });
+    if (!request) return res.status(404).json({ success: false, message: 'Category request not found' });
+    res.status(200).json({ success: true, data: request });
+  } catch (error) { next(error); }
+};
+
 module.exports = {
   getUsers,
   getUserById,
@@ -193,5 +236,8 @@ module.exports = {
   verifyUserKYC,
   deleteUser,
   getServices,
-  deleteService
+  deleteService,
+  reviewService
+  ,getCategoryRequests
+  ,reviewCategoryRequest
 };

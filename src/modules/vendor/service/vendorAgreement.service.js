@@ -6,33 +6,27 @@ VENDOR COMMISSION AGREEMENT
 This agreement outlines the commission structure between Asaan Taqreeb and our vendor partners.
 
 1. COMMISSION RATE:
-   - Commission Rate: 3% of every booking amount
+   - Commission Rate: 5% of every booking amount
    - Commission is calculated on the total amount charged to the customer
 
-2. PAYMENT FREQUENCY OPTIONS:
-   You can choose one of the following payment methods:
-   
-   a) Per Booking: Pay commission immediately after each booking is completed
-   b) Monthly: Accumulate commissions throughout the month and pay on the 1st of the following month
-
-3. PAYMENT PROCESS:
+2. PAYMENT PROCESS:
    - You will be provided with our bank details
    - Please transfer the commission amount and attach a screenshot as proof
    - We will verify and confirm receipt of payment
 
-4. OUTSTANDING COMMISSION:
+3. OUTSTANDING COMMISSION:
    - If commission is not paid on time, you will receive a notification reminder
    - Failure to pay outstanding commission may result in account suspension or termination
    - We maintain the right to suspend your account if payments are consistently overdue
 
-5. COMMISSION TRACKING:
+4. COMMISSION TRACKING:
    - Your commission dashboard will show:
      * Outstanding commission (unpaid)
      * Commission history
      * Previous payments
      * Due dates
 
-6. TERMINATION:
+5. TERMINATION:
    - Non-payment of commissions may lead to immediate account deactivation
    - We will attempt to contact you before taking any action
 
@@ -49,7 +43,7 @@ const getAgreementByUserId = async (userId) => {
   }
 };
 
-const createAgreement = async (userId, paymentFrequency = 'per_booking') => {
+const createAgreement = async (userId) => {
   try {
     // Check if agreement already exists
     const existing = await VendorAgreement.findOne({ user: userId });
@@ -59,8 +53,7 @@ const createAgreement = async (userId, paymentFrequency = 'per_booking') => {
 
     const agreement = new VendorAgreement({
       user: userId,
-      paymentFrequency: paymentFrequency || 'per_booking',
-      commissionRate: 3,
+      commissionRate: 5,
       agreementText: DEFAULT_AGREEMENT_TEXT,
       accepted: false,
       status: 'pending',
@@ -74,18 +67,18 @@ const createAgreement = async (userId, paymentFrequency = 'per_booking') => {
   }
 };
 
-const acceptAgreement = async (userId, paymentFrequency) => {
+const acceptAgreement = async (userId) => {
   try {
     let agreement = await VendorAgreement.findOne({ user: userId });
 
     if (!agreement) {
-      agreement = await createAgreement(userId, paymentFrequency);
+      agreement = await createAgreement(userId);
     }
 
     agreement.accepted = true;
     agreement.status = 'accepted';
     agreement.acceptedAt = new Date();
-    agreement.paymentFrequency = paymentFrequency || agreement.paymentFrequency;
+    agreement.commissionRate = 5;
 
     await agreement.save();
     return agreement;

@@ -20,7 +20,7 @@ const commissionHistorySchema = new mongoose.Schema(
     },
     rate: {
       type: Number,
-      default: 3, // 3% commission
+      default: 5,
     },
     baseAmount: {
       type: Number,
@@ -32,11 +32,6 @@ const commissionHistorySchema = new mongoose.Schema(
       enum: ['charged', 'paid'],
       default: 'charged',
       index: true,
-    },
-    paymentFrequency: {
-      type: String,
-      enum: ['per_booking', 'monthly'],
-      default: 'per_booking',
     },
     dueDate: {
       type: Date,

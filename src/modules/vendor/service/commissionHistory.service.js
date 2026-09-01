@@ -1,20 +1,14 @@
 const CommissionHistory = require('../model/commissionHistory.model');
 const VendorAgreement = require('../model/vendorAgreement.model');
 
-const COMMISSION_RATE = 3; // 3%
+const COMMISSION_RATE = 5;
 
-const addCommissionCharge = async (userId, bookingId, baseAmount, paymentFrequency = 'per_booking') => {
+const addCommissionCharge = async (userId, bookingId, baseAmount) => {
   try {
     const amount = (baseAmount * COMMISSION_RATE) / 100;
     
-    let dueDate = new Date();
-    if (paymentFrequency === 'monthly') {
-      // Due on 1st of next month
-      dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 1);
-    } else {
-      // Due in 3 days for per_booking
-      dueDate.setDate(dueDate.getDate() + 3);
-    }
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 3);
 
     const commission = new CommissionHistory({
       user: userId,
@@ -23,7 +17,6 @@ const addCommissionCharge = async (userId, bookingId, baseAmount, paymentFrequen
       rate: COMMISSION_RATE,
       baseAmount,
       type: 'charged',
-      paymentFrequency,
       dueDate,
       status: 'pending',
     });

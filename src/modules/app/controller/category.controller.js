@@ -1,4 +1,5 @@
 const categoryService = require('../service/category.service');
+const CategoryRequest = require('../model/categoryRequest.model');
 
 const getAllCategories = async (req, res) => {
   try {
@@ -136,10 +137,20 @@ const deleteCategory = async (req, res) => {
   }
 };
 
+const requestCategory = async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    if (!name?.trim() || !description?.trim()) return res.status(400).json({ success: false, error: 'name and description are required' });
+    const request = await CategoryRequest.create({ vendor: req.user.id, name, description });
+    res.status(201).json({ success: true, data: request });
+  } catch (error) { res.status(500).json({ success: false, error: 'Failed to submit category request' }); }
+};
+
 module.exports = {
   getAllCategories,
   getCategoryByKey,
   createCategory,
   updateCategory,
   deleteCategory,
+  requestCategory,
 };

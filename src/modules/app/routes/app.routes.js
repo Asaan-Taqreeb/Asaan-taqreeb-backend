@@ -11,6 +11,7 @@ router.get('/update-info', appController.getUpdateInfo);
 // Category routes
 router.get('/categories', categoryController.getAllCategories);
 router.get('/categories/:key', categoryController.getCategoryByKey);
+router.post('/category-requests', authenticate, authorize(ROLES.VENDOR), categoryController.requestCategory);
 router.post('/categories', authenticate, authorize(ROLES.ADMIN), categoryController.createCategory);
 router.put('/categories/:id', authenticate, authorize(ROLES.ADMIN), categoryController.updateCategory);
 router.delete('/categories/:id', authenticate, authorize(ROLES.ADMIN), categoryController.deleteCategory);
