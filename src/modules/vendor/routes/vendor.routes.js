@@ -2,7 +2,7 @@ const express = require('express');
 const vendorController = require('../controller/vendor.controller');
 const vendorAgreementController = require('../controller/vendorAgreement.controller');
 const commissionHistoryController = require('../controller/commissionHistory.controller');
-const { authenticate, authorize } = require('../../shared/middleware/auth');
+const { protect: authenticate, authorize } = require('../../../shared/middleware/auth.middleware');
 
 const router = express.Router();
 

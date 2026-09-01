@@ -1,7 +1,7 @@
 const express = require('express');
 const appController = require('../controller/app.controller');
 const categoryController = require('../controller/category.controller');
-const { authenticate, authorize } = require('../../shared/middleware/auth');
+const { protect: authenticate, authorize } = require('../../../shared/middleware/auth.middleware');
 
 const router = express.Router();
 
