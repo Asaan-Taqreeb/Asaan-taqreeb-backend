@@ -2,7 +2,7 @@ const commissionHistoryService = require('../service/commissionHistory.service')
 
 const getCommissionHistory = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?.id || req.user?._id;
     const { limit = 12, skip = 0 } = req.query;
 
     const result = await commissionHistoryService.getCommissionHistory(
@@ -27,7 +27,7 @@ const getCommissionHistory = async (req, res) => {
 
 const getCommissionSummary = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?.id || req.user?._id;
 
     const summary = await commissionHistoryService.getCommissionSummary(userId);
 
@@ -47,7 +47,7 @@ const getCommissionSummary = async (req, res) => {
 
 const getMonthlyCommissionSummary = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?.id || req.user?._id;
     const { months = 6 } = req.query;
 
     const monthlySummary = await commissionHistoryService.getMonthlyCommissionSummary(
@@ -71,7 +71,7 @@ const getMonthlyCommissionSummary = async (req, res) => {
 
 const getOverdueCommissions = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?.id || req.user?._id;
 
     const overdue = await commissionHistoryService.getOverdueCommissions(userId);
 

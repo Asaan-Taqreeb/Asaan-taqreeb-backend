@@ -24,7 +24,7 @@ const protect = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Account is deactivated' });
     }
 
-    req.user = { id: user._id, role: decoded.role || user.role };
+    req.user = { id: user._id, _id: user._id, role: decoded.role || user.role };
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Not authorized, invalid token' });
@@ -32,11 +32,12 @@ const protect = async (req, res, next) => {
 };
 
 const authorize = (...roles) => {
+  const allowedRoles = roles.flat();
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    if (!allowedRoles.includes(req.user?.role)) {
       return res.status(403).json({
         success: false,
-        message: `Role '${req.user.role}' is not allowed to access this resource`,
+        message: `Role '${req.user?.role}' is not allowed to access this resource`,
       });
     }
     next();
