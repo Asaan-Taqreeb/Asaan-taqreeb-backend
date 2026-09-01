@@ -9,8 +9,9 @@ const router = express.Router();
 
 const baseValidation = [
   body('category')
-    .isIn(['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON'])
-    .withMessage('Invalid category'),
+    .trim()
+    .notEmpty()
+    .withMessage('Category is required'),
   body('basicInfo.name').trim().notEmpty().withMessage('Name is required'),
   body('basicInfo.location').trim().notEmpty().withMessage('Location is required'),
 ];

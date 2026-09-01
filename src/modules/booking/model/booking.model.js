@@ -61,7 +61,7 @@ const bookingSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: ['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON'],
+      trim: true,
     },
     selectedPackage: {
       type: selectedPackageSchema,

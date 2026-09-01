@@ -9,8 +9,9 @@ const router = express.Router();
 const createBookingValidation = [
   body('serviceId').notEmpty().withMessage('serviceId is required'),
   body('category')
-    .isIn(['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON'])
-    .withMessage('Invalid category'),
+    .trim()
+    .notEmpty()
+    .withMessage('Category is required'),
   body('packageName').trim().notEmpty().withMessage('packageName is required'),
   body('guestCount').custom((value, { req }) => {
     const category = String(req.body.category || '').toUpperCase();
