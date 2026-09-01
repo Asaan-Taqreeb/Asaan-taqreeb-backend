@@ -4,8 +4,8 @@ require('dotenv').config();
 
 const seedCategories = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/asaan-taqreeb');
+    const mongoUri = process.argv[2] || process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/asaan-taqreeb';
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000 });
     console.log('Connected to MongoDB');
 
     // Clear existing categories
