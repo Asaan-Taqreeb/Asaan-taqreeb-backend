@@ -80,8 +80,10 @@ const createVendorService = async (userId, payload) => {
 };
 
 const getAllServices = async () => {
-  // Legacy listings predate moderation and remain visible; every new/edited listing is explicit pending.
-  const services = await VendorService.find({ $or: [{ approvalStatus: 'approved' }, { approvalStatus: { $exists: false } }] }).populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } }).lean();
+  const services = await VendorService.find({ approvalStatus: { $ne: 'rejected' } })
+    .populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } })
+    .sort({ createdAt: -1 })
+    .lean();
   return services.filter((service) => service.user);
 };
 

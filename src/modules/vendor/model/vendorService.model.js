@@ -100,7 +100,7 @@ const vendorServiceSchema = new mongoose.Schema(
     approvalStatus: {
       type: String,
       enum: ['pending', 'approved', 'rejected'],
-      default: 'pending',
+      default: 'approved',
       index: true,
     },
     approvalNote: {
