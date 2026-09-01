@@ -1,7 +1,7 @@
 const VendorService = require('../model/vendorService.model');
 const VendorAvailability = require('../model/vendorAvailability.model');
 
-const CATEGORIES = ['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON'];
+const CATEGORIES = ['BANQUET_HALL', 'CATERING', 'PHOTOGRAPHY', 'PARLOR_SALON', 'SALON_MEN'];
 
 const populateActiveUserQuery = (query) => query.populate({ path: 'user', select: 'name email role isActive', match: { isActive: true } });
 
