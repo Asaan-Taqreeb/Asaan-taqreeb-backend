@@ -1,18 +1,6 @@
 const { validationResult } = require('express-validator');
 const vendorServiceService = require('../service/vendorService.service');
 const { uploadMultipleImages, deleteFromCloudinary } = require('../../../shared/utils/upload.util');
-const cacheManager = require('../../../shared/cache/cache.manager');
-
-const notifyServiceUpdate = (action, serviceId) => {
-  cacheManager.del('SERVICES');
-  try {
-    const { getIo } = require('../../../config/socket');
-    const io = getIo();
-    if (io) {
-      io.emit('SERVICE_UPDATE', { action, serviceId });
-    }
-  } catch (_) {}
-};
 
 const createService = async (req, res, next) => {
   try {
@@ -22,7 +10,6 @@ const createService = async (req, res, next) => {
     }
 
     const result = await vendorServiceService.createVendorService(req.user.id, req.body);
-    notifyServiceUpdate('created', result?._id);
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -31,14 +18,7 @@ const createService = async (req, res, next) => {
 
 const getAllServices = async (req, res, next) => {
   try {
-    const cacheKey = 'SERVICES_ALL';
-    const cached = cacheManager.get(cacheKey);
-    if (cached) {
-      return res.status(200).json({ success: true, data: cached, fromCache: true });
-    }
-
     const services = await vendorServiceService.getAllServices();
-    cacheManager.set(cacheKey, services, 600); // 10 minutes cache
     res.status(200).json({ success: true, data: services });
   } catch (error) {
     next(error);
@@ -47,14 +27,7 @@ const getAllServices = async (req, res, next) => {
 
 const getMyServices = async (req, res, next) => {
   try {
-    const cacheKey = `SERVICES_USER_${req.user.id}`;
-    const cached = cacheManager.get(cacheKey);
-    if (cached) {
-      return res.status(200).json({ success: true, data: cached, fromCache: true });
-    }
-
     const services = await vendorServiceService.getServicesByUser(req.user.id);
-    cacheManager.set(cacheKey, services, 300);
     res.status(200).json({ success: true, data: services });
   } catch (error) {
     next(error);
@@ -82,7 +55,6 @@ const updateService = async (req, res, next) => {
       req.user.id,
       req.body
     );
-    notifyServiceUpdate('updated', req.params.id);
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -92,7 +64,6 @@ const updateService = async (req, res, next) => {
 const deleteService = async (req, res, next) => {
   try {
     const result = await vendorServiceService.deleteService(req.params.id, req.user.id);
-    notifyServiceUpdate('deleted', req.params.id);
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);

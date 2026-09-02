@@ -90,9 +90,44 @@ const getOverdueCommissions = async (req, res) => {
   }
 };
 
+const recordPayment = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const { amount, transactionId, paymentProofUrl, notes } = req.body;
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid payment amount' });
+    }
+
+    const result = await commissionHistoryService.recordCommissionPayment(
+      userId,
+      Number(amount),
+      {
+        transactionId: transactionId || `TXN-${Date.now()}`,
+        screenshotUrl: paymentProofUrl || null,
+        notes: notes || '',
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Commission payment recorded successfully',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error recording commission payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing commission payment',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getCommissionHistory,
   getCommissionSummary,
   getMonthlyCommissionSummary,
   getOverdueCommissions,
+  recordPayment,
 };

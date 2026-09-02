@@ -22,5 +22,6 @@ router.get('/commission/history', authenticate, authorize(ROLES.VENDOR), commiss
 router.get('/commission/summary', authenticate, authorize(ROLES.VENDOR), commissionHistoryController.getCommissionSummary);
 router.get('/commission/summary/monthly', authenticate, authorize(ROLES.VENDOR), commissionHistoryController.getMonthlyCommissionSummary);
 router.get('/commission/overdue', authenticate, authorize(ROLES.VENDOR), commissionHistoryController.getOverdueCommissions);
+router.post('/commission/pay', authenticate, authorize(ROLES.VENDOR), commissionHistoryController.recordPayment);
 
 module.exports = router;
