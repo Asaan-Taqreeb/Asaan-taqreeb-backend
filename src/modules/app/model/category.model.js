@@ -23,6 +23,7 @@ const categorySchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: ['Sparkles', 'House', 'Utensils', 'Video', 'Scissors', 'Car', 'Palette', 'Users'],
+      default: 'Sparkles',
     },
     color: {
       type: String,
