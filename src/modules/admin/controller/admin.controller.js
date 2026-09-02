@@ -1,42 +1,34 @@
 const User = require('../../auth/model/user.model');
-const identityService = require('../../auth/service/identity.service');
-const authService = require('../../auth/service/auth.service');
 const VendorService = require('../../vendor/model/vendorService.model');
 const CategoryRequest = require('../../app/model/categoryRequest.model');
+const Category = require('../../app/model/category.model');
+const Booking = require('../../booking/model/booking.model');
+const ROLES = require('../../../shared/enums/roles.enum');
 
 const getUsers = async (req, res, next) => {
   try {
-    const { role, verificationStatus, isActive, search, limit = 10, page = 1 } = req.query;
+    const { role, isActive, verificationStatus, search, page = 1, limit = 20 } = req.query;
 
-    const query = { deletedAt: { $exists: false } };
-    const andConditions = [];
+    const query = {};
 
-    if (role) {
-      andConditions.push({
-        $or: [
-          { role: role },
-          { roles: role }
-        ]
-      });
+    if (role && Object.values(ROLES).includes(role)) {
+      query.roles = role;
     }
-    if (verificationStatus) {
-      query.verificationStatus = verificationStatus;
-    }
+
     if (isActive !== undefined) {
       query.isActive = isActive === 'true';
     }
-    if (search) {
-      andConditions.push({
-        $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { email: { $regex: search, $options: 'i' } },
-          { phone: { $regex: search, $options: 'i' } }
-        ]
-      });
+
+    if (verificationStatus) {
+      query.verificationStatus = verificationStatus;
     }
 
-    if (andConditions.length > 0) {
-      query.$and = andConditions;
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
     }
 
     const parsedLimit = parseInt(limit, 10);
@@ -45,6 +37,7 @@ const getUsers = async (req, res, next) => {
 
     const totalUsers = await User.countDocuments(query);
     const users = await User.find(query)
+      .select('-passwordHash')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parsedLimit);
@@ -65,7 +58,7 @@ const getUsers = async (req, res, next) => {
 
 const getUserById = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id).select('-passwordHash');
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -78,21 +71,21 @@ const getUserById = async (req, res, next) => {
 const updateUserStatus = async (req, res, next) => {
   try {
     const { isActive } = req.body;
-    if (isActive === undefined) {
-      return res.status(400).json({ success: false, message: 'isActive field is required' });
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'isActive must be a boolean' });
     }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { isActive },
       { new: true }
-    );
+    ).select('-passwordHash');
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    res.status(200).json({ success: true, message: 'User status updated successfully', data: user });
+    res.status(200).json({ success: true, data: user });
   } catch (error) {
     next(error);
   }
@@ -101,11 +94,26 @@ const updateUserStatus = async (req, res, next) => {
 const verifyUserKYC = async (req, res, next) => {
   try {
     const { status, rejectionReason } = req.body;
-    if (!status) {
-      return res.status(400).json({ success: false, message: 'Status is required' });
+    if (!['verified', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Status must be verified or rejected' });
     }
-    const result = await identityService.updateKycStatus(req.params.id, status, rejectionReason);
-    res.status(200).json({ success: true, data: result });
+
+    const updateData = { verificationStatus: status };
+    if (status === 'rejected' && rejectionReason) {
+      updateData.rejectionReason = rejectionReason;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).select('-passwordHash');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.status(200).json({ success: true, data: user });
   } catch (error) {
     next(error);
   }
@@ -113,23 +121,33 @@ const verifyUserKYC = async (req, res, next) => {
 
 const deleteUser = async (req, res, next) => {
   try {
-    const result = await authService.deleteAccount(req.params.id);
-    res.status(200).json({ success: true, data: result });
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+    await VendorService.deleteMany({ user: req.params.id });
+
+    res.status(200).json({ success: true, message: 'User and associated data deleted successfully' });
   } catch (error) {
     next(error);
   }
 };
 
-// Admin Services Endpoints
 const getServices = async (req, res, next) => {
   try {
-    const { category, search, limit = 50, page = 1 } = req.query;
+    const { category, search, page = 1, limit = 20, vendorId, user } = req.query;
 
     const query = {};
     const andConditions = [];
 
     if (category && category !== 'All') {
-      query.category = category;
+      andConditions.push({ category });
+    }
+
+    if (vendorId || user) {
+      andConditions.push({ user: vendorId || user });
     }
 
     if (search) {
@@ -145,10 +163,6 @@ const getServices = async (req, res, next) => {
       query.$and = andConditions;
     }
 
-    if (req.query.vendorId || req.query.user) {
-      query.user = req.query.vendorId || req.query.user;
-    }
-
     const parsedLimit = parseInt(limit, 10);
     const parsedPage = parseInt(page, 10);
     const skip = (parsedPage - 1) * parsedLimit;
@@ -160,7 +174,6 @@ const getServices = async (req, res, next) => {
       .skip(skip)
       .limit(parsedLimit);
 
-    // Clean any services that might not have a valid associated user
     const filteredServices = services.filter(service => service.user);
 
     res.status(200).json({
@@ -227,7 +240,6 @@ const reviewCategoryRequest = async (req, res, next) => {
   try {
     const { status, note } = req.body;
     if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ success: false, message: 'status must be approved or rejected' });
-    const request = await CategoryRequest.findByIdAndUpdate(req.params.id, { status, adminNote: note?.trim() || null, reviewedBy: req.user.id, reviewedAt: new Date() }, { new: true });
     
     const request = await CategoryRequest.findByIdAndUpdate(
       req.params.id, 
@@ -243,7 +255,6 @@ const reviewCategoryRequest = async (req, res, next) => {
 
     // When approved, automatically create and activate the category in MongoDB
     if (status === 'approved' && request.categoryName) {
-      const Category = require('../../app/model/category.model');
       const slug = request.categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
       await Category.findOneAndUpdate(
         { key: slug },
@@ -266,7 +277,6 @@ const reviewCategoryRequest = async (req, res, next) => {
 
 const getRevenueAnalytics = async (req, res, next) => {
   try {
-    const Booking = require('../../booking/model/booking.model');
     const bookings = await Booking.find({})
       .populate('vendor', 'name email phone')
       .populate('client', 'name email')
@@ -333,9 +343,6 @@ module.exports = {
   deleteUser,
   getServices,
   deleteService,
-  reviewService
-  ,getCategoryRequests
-  ,reviewCategoryRequest
   reviewService,
   getCategoryRequests,
   reviewCategoryRequest,
