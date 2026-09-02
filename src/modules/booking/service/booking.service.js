@@ -119,11 +119,12 @@ const checkTimeSlotConflict = async (vendorId, date, timeSlot, branchId, categor
 
   // 2. Determine allowed concurrent capacity for this service
   let allowedCapacity = 1;
-  if (category === 'PARLOR_SALON') {
+  const upperCat = String(category || '').toUpperCase();
+  if (upperCat.includes('PARLOR') || upperCat.includes('SALON')) {
     allowedCapacity = (service && service.capacity && Number(service.capacity.maxGuests))
       ? Number(service.capacity.maxGuests)
       : 3; // Default 3 concurrent clients for salon
-  } else if (category === 'PHOTOGRAPHY') {
+  } else if (upperCat.includes('PHOTO')) {
     allowedCapacity = (service && service.capacity && Number(service.capacity.maxGuests))
       ? Number(service.capacity.maxGuests)
       : 1; // Default 1 team/slot for photography unless studio has more
@@ -183,13 +184,11 @@ const createBooking = async (clientId, payload) => {
     throw error;
   }
 
-  if (service.category !== category) {
-    const error = new Error('Category mismatch for this service');
-    error.statusCode = 400;
-    throw error;
-  }
+  // Use the canonical category from the service directly
+  const canonicalCategory = service.category || category;
+  const upperCat = String(canonicalCategory || '').toUpperCase();
 
-  const requiresGuestCount = category === 'BANQUET_HALL' || category === 'CATERING';
+  const requiresGuestCount = upperCat.includes('BANQUET') || upperCat.includes('CATER');
   const normalizedGuestCount = guestCount !== undefined && guestCount !== null && guestCount !== ''
     ? Number(guestCount)
     : undefined;
@@ -200,7 +199,7 @@ const createBooking = async (clientId, payload) => {
     throw error;
   }
 
-  if (category === 'BANQUET_HALL' && service.capacity && service.capacity.maxGuests && normalizedGuestCount) {
+  if (upperCat.includes('BANQUET') && service.capacity && service.capacity.maxGuests && normalizedGuestCount) {
     if (normalizedGuestCount > service.capacity.maxGuests || normalizedGuestCount < service.capacity.minGuests) {
       const error = new Error(
         `Guest count must be between ${service.capacity.minGuests} and ${service.capacity.maxGuests}`
@@ -217,7 +216,7 @@ const createBooking = async (clientId, payload) => {
         name: packageName || 'Custom Package',
         price: totalAmount,
         guestCount: normalizedGuestCount,
-        pricePerHead: (category === 'CATERING' || category === 'BANQUET_HALL') && normalizedGuestCount ? Math.round(totalAmount / normalizedGuestCount) : undefined,
+        pricePerHead: requiresGuestCount && normalizedGuestCount ? Math.round(totalAmount / normalizedGuestCount) : undefined,
         details: 'Custom Package',
         items: [],
       };
@@ -234,20 +233,20 @@ const createBooking = async (clientId, payload) => {
   };
 
   // Check for time slot conflicts BEFORE creating booking
-  await checkTimeSlotConflict(service.user._id, date, normalizedTimeSlot, branchId, category, service);
+  await checkTimeSlotConflict(service.user._id, date, normalizedTimeSlot, branchId, canonicalCategory, service);
 
   const addons = selectedAddons
     .map((name) => service.optionalServices.find((a) => a.name === name))
     .filter(Boolean)
     .map((a) => ({ name: a.name, price: a.price }));
 
-  const pricing = calculatePricing(category, pkg, normalizedGuestCount, totalAmount, advancePayment);
+  const pricing = calculatePricing(canonicalCategory, pkg, normalizedGuestCount, totalAmount, advancePayment);
 
   const booking = await Booking.create({
     client: clientId,
     vendor: service.user._id,
     service: service._id,
-    category,
+    category: canonicalCategory,
     selectedPackage: {
       name: pkg.name,
       price: pkg.price,
